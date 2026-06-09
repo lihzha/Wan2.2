@@ -12,6 +12,7 @@ from functools import partial
 import torch
 import torch.cuda.amp as amp
 import torch.distributed as dist
+import torch.utils.checkpoint as checkpoint_utils
 import torchvision.transforms.functional as TF
 from PIL import Image
 from tqdm import tqdm
@@ -617,3 +618,217 @@ class WanTI2V:
             dist.barrier()
 
         return videos[0] if self.rank == 0 else None
+
+    def encode_prompt(self, prompt, negative=False):
+        """Encode a text prompt via the T5 encoder, returning a single
+        [L, 4096] tensor on self.device. Used to seed learnable embeddings."""
+        self.text_encoder.model.to(self.device)
+        out = self.text_encoder([prompt], self.device)[0]
+        return out
+
+    def i2v_diff(self,
+                 img,
+                 context,
+                 context_null,
+                 max_area=704 * 1280,
+                 frame_num=17,
+                 shift=5.0,
+                 sample_solver='unipc',
+                 sampling_steps=8,
+                 guide_scale=5.0,
+                 seed=0,
+                 use_gradient_checkpointing=True,
+                 decode_video=False,
+                 return_last_frame_only=True,
+                 noise=None):
+        r"""
+        Differentiable variant of i2v that accepts precomputed text embeddings
+        and runs the sampling loop with gradients enabled, so a learnable
+        `context` tensor can be optimized end-to-end via a loss computed on
+        the final latent (or decoded video).
+
+        Args:
+            img (PIL.Image.Image):
+                Start frame (I_0).
+            context (Tensor[L, 4096] or List[Tensor]):
+                Positive text embedding. `requires_grad=True` to optimize.
+            context_null (Tensor[L, 4096] or List[Tensor]):
+                Negative (unconditional) text embedding. Typically detached.
+            max_area (int):
+                Target pixel area for the generated video.
+            frame_num (int):
+                Output frame count. Must be 4n+1. Short horizons (e.g. 17)
+                dramatically cut memory cost for backprop.
+            sample_solver (str):
+                'unipc' or 'dpm++'.
+            sampling_steps (int):
+                Number of diffusion steps. Lower = cheaper gradient pass.
+            guide_scale (float):
+                CFG scale. Set 1.0 to skip the unconditional forward during
+                search (halves DiT cost), re-enable for final validation.
+            seed (int):
+                Deterministic initial noise.
+            use_gradient_checkpointing (bool):
+                Wrap each DiT block in torch.utils.checkpoint.checkpoint
+                to trade compute for memory.
+            decode_video (bool):
+                If True, also VAE-decode the final latent and return it.
+                Required for pixel-space losses (LPIPS/SSIM); skip for
+                latent-space losses to save memory.
+            return_last_frame_only (bool):
+                If decode_video=True and this is True, returns only the last
+                decoded frame (shape [3, H, W]) instead of the full video.
+
+        Returns:
+            dict with keys:
+              - 'latent':   Tensor[C_z, F_z, H_z, W_z], final latent (with grad)
+              - 'latent_last_frame': Tensor[C_z, H_z, W_z] (with grad)
+              - 'video' / 'last_frame': only if decode_video=True
+        """
+        # --- normalize context to list-of-tensor form expected by the DiT ---
+        if torch.is_tensor(context):
+            context_list = [context]
+        else:
+            context_list = list(context)
+        if torch.is_tensor(context_null):
+            context_null_list = [context_null]
+        else:
+            context_null_list = list(context_null)
+
+        # --- preprocess image (same as i2v) ---
+        ih, iw = img.height, img.width
+        dh, dw = self.patch_size[1] * self.vae_stride[1], self.patch_size[
+            2] * self.vae_stride[2]
+        ow, oh = best_output_size(iw, ih, dw, dh, max_area)
+
+        scale = max(ow / iw, oh / ih)
+        img = img.resize((round(iw * scale), round(ih * scale)), Image.LANCZOS)
+        x1 = (img.width - ow) // 2
+        y1 = (img.height - oh) // 2
+        img = img.crop((x1, y1, x1 + ow, y1 + oh))
+        img_t = TF.to_tensor(img).sub_(0.5).div_(0.5).to(self.device).unsqueeze(1)
+
+        F = frame_num
+        seq_len = ((F - 1) // self.vae_stride[0] + 1) * (
+            oh // self.vae_stride[1]) * (ow // self.vae_stride[2]) // (
+                self.patch_size[1] * self.patch_size[2])
+        seq_len = int(math.ceil(seq_len / self.sp_size)) * self.sp_size
+
+        # --- init noise (fixed seed for reproducibility across opt steps) ---
+        # If `noise` is passed in (e.g. by --mode noise in embedding_search.py),
+        # we use it directly so its grad can flow back to the caller's leaf.
+        seed_g = torch.Generator(device=self.device)
+        seed_g.manual_seed(int(seed))
+        if noise is None:
+            noise = torch.randn(
+                self.vae.model.z_dim, (F - 1) // self.vae_stride[0] + 1,
+                oh // self.vae_stride[1],
+                ow // self.vae_stride[2],
+                dtype=torch.float32,
+                generator=seed_g,
+                device=self.device)
+
+        # --- VAE-encode the start frame (no grad; fixed conditioning) ---
+        with torch.no_grad():
+            z = self.vae.encode([img_t])
+
+        # --- scheduler (fresh instance each call: clears cached sample state) ---
+        if sample_solver == 'unipc':
+            sample_scheduler = FlowUniPCMultistepScheduler(
+                num_train_timesteps=self.num_train_timesteps,
+                shift=1,
+                use_dynamic_shifting=False)
+            sample_scheduler.set_timesteps(
+                sampling_steps, device=self.device, shift=shift)
+            timesteps = sample_scheduler.timesteps
+        elif sample_solver == 'dpm++':
+            sample_scheduler = FlowDPMSolverMultistepScheduler(
+                num_train_timesteps=self.num_train_timesteps,
+                shift=1,
+                use_dynamic_shifting=False)
+            sampling_sigmas = get_sampling_sigmas(sampling_steps, shift)
+            timesteps, _ = retrieve_timesteps(
+                sample_scheduler,
+                device=self.device,
+                sigmas=sampling_sigmas)
+        else:
+            raise NotImplementedError("Unsupported solver.")
+
+        self.model.to(self.device)
+
+        # --- optional gradient checkpointing: wrap each block's forward ---
+        # With use_reentrant=False, checkpoint forwards **kwargs to the
+        # wrapped callable and tracks tensors in both args and kwargs in
+        # autograd, so gradient flows back through `context` as expected.
+        original_block_forwards = []
+        if use_gradient_checkpointing:
+            for block in self.model.blocks:
+                original_block_forwards.append(block.forward)
+
+                def make_ckpt(orig_forward):
+                    def ckpt_forward(x, **kwargs):
+                        return checkpoint_utils.checkpoint(
+                            orig_forward, x, use_reentrant=False, **kwargs)
+                    return ckpt_forward
+
+                block.forward = make_ckpt(block.forward)
+
+        try:
+            # --- sampling loop (NO torch.no_grad — gradients flow through) ---
+            latent = noise
+            mask1, mask2 = masks_like([noise], zero=True)
+            latent = (1. - mask2[0]) * z[0] + mask2[0] * latent
+
+            arg_c = {'context': context_list, 'seq_len': seq_len}
+            arg_null = {'context': context_null_list, 'seq_len': seq_len}
+
+            use_cfg = abs(guide_scale - 1.0) > 1e-6
+
+            with torch.amp.autocast('cuda', dtype=self.param_dtype):
+                for t in timesteps:
+                    latent_model_input = [latent]
+                    timestep = torch.stack([t]).to(self.device)
+
+                    temp_ts = (mask2[0][0][:, ::2, ::2] * timestep).flatten()
+                    temp_ts = torch.cat([
+                        temp_ts,
+                        temp_ts.new_ones(seq_len - temp_ts.size(0)) * timestep
+                    ])
+                    timestep = temp_ts.unsqueeze(0)
+
+                    noise_pred_cond = self.model(
+                        latent_model_input, t=timestep, **arg_c)[0]
+
+                    if use_cfg:
+                        noise_pred_uncond = self.model(
+                            latent_model_input, t=timestep, **arg_null)[0]
+                        noise_pred = noise_pred_uncond + guide_scale * (
+                            noise_pred_cond - noise_pred_uncond)
+                    else:
+                        noise_pred = noise_pred_cond
+
+                    temp_x0 = sample_scheduler.step(
+                        noise_pred.unsqueeze(0),
+                        t,
+                        latent.unsqueeze(0),
+                        return_dict=False,
+                        generator=seed_g)[0]
+                    latent = temp_x0.squeeze(0)
+                    latent = (1. - mask2[0]) * z[0] + mask2[0] * latent
+        finally:
+            # restore block forwards
+            if use_gradient_checkpointing:
+                for block, orig in zip(self.model.blocks, original_block_forwards):
+                    block.forward = orig
+
+        out = {
+            'latent': latent,
+            'latent_last_frame': latent[:, -1],
+        }
+        if decode_video:
+            video = self.vae.decode([latent])[0]  # [3, F_out, H, W]
+            if return_last_frame_only:
+                out['last_frame'] = video[:, -1]
+            else:
+                out['video'] = video
+        return out

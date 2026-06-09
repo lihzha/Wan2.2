@@ -1042,8 +1042,8 @@ class Wan2_2_VAE:
             with amp.autocast(dtype=self.dtype):
                 return [
                     self.model.decode(u.unsqueeze(0),
-                                      self.scale).float().clamp_(-1,
-                                                                 1).squeeze(0)
+                                      self.scale).float().clamp(-1,
+                                                                1).squeeze(0)
                     for u in zs
                 ]
         except TypeError as e:
