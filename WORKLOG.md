@@ -985,6 +985,92 @@ Next:
 - Use commit `e07e71f` as the local implementation baseline for future Della
   syncs and job worklog entries.
 
+## 2026-06-09 13:33 PDT - Fork-Based Git Deployment Initialization
+
+Goal:
+- Replace the old rsync-for-code workflow with the Git workflow required by
+  the updated Della and generic cluster skills.
+
+Hypothesis:
+- The safe one-time fix is to preserve the rsync-derived snapshot, attach the
+  repo to the real upstream `Wan-Video/Wan2.2` history, create a user fork for
+  writable development, and make future Della deployments pull exact commits
+  from that fork.
+
+Change:
+- Read the latest `della-gpu-cluster-workflow` and
+  `robotics-cluster-development-core` skills.
+- Fetched upstream `https://github.com/Wan-Video/Wan2.2.git` at `42bf4cf`.
+- Created fork `https://github.com/lihzha/Wan2.2`.
+- Preserved the standalone rsync-derived local history on branch
+  `rsync-snapshot`.
+- Reset local `main` to `upstream/main`, applied all local action-adapter,
+  z-init, DROID, docs, tests, and worklog changes on top of upstream history,
+  and avoided deleting upstream tracked sample videos that were absent from the
+  rsync copy.
+- Updated `scripts/della_loop.sh` and `docs/della_workflow.md` so tracked code
+  uses `commit -> push -> Della git fetch/reset`, while rsync remains only for
+  logs/results/artifacts.
+
+Version Control:
+- branch: `main`
+- base_commit: `42bf4cf` (`upstream/main`)
+- implementation_commit: `b99d040`
+- push/pull: fork push pending; Della pull blocked because `ssh della-gpu`
+  still fails with `Connection closed by UNKNOWN port 65535`
+- changed_files:
+  - action-adapter implementation, trainers, exporters, tests, and docs
+  - z-init/inversion analysis scripts and wrappers
+  - DROID cache planning/training scripts and wrappers
+  - `scripts/della_loop.sh`
+  - `docs/della_workflow.md`
+  - `WORKLOG.md`
+- remote_commit/status: local fork not pushed yet at the time of this entry;
+  Della checkout not reachable
+
+Command / Job:
+- command:
+  - `gh repo fork Wan-Video/Wan2.2 --clone=false --default-branch-only`
+  - `git fetch upstream main --tags`
+  - `git switch -C main upstream/main`
+  - `git apply --index <local_changes_no_deletes.patch>`
+  - `git commit -m "Add action adapter experiments and Git-based Della workflow"`
+- job_id: n/a
+- run_dir: local `/Users/lzha/code/Wan2.2`
+- logs: n/a
+- artifacts: fork `https://github.com/lihzha/Wan2.2`, local branch
+  `rsync-snapshot`
+
+Result:
+- status: passed locally, cluster conversion pending
+- metrics/artifacts:
+  - upstream-based commit `b99d040`
+  - no tracked deletions relative to upstream, so upstream sample videos are
+    preserved
+  - `scripts/della_loop.sh deploy-code` now pushes local `HEAD`, initializes or
+    updates the Della checkout with Git, resets tracked files to the fetched
+    commit, and verifies the remote HEAD matches
+- key evidence:
+  - shell syntax check passed for all `*.sh` files
+  - Python compile check passed for `models`, `scripts`, `wan`, and top-level
+    Python entrypoints
+  - focused `git diff --check` passed for the authored workflow/action/z-init
+    files
+
+Analysis:
+- The earlier `.git` absence was a direct consequence of the old rsync workflow
+  excluding `.git/`. The updated skill correctly treats this as a provenance
+  problem: the cluster should run a Git checkout, not an opaque rsync mirror.
+- Rebuilding on top of upstream history is better than pushing the standalone
+  `e07e71f`/`14f5458` root history because it keeps future upstream merges and
+  fork comparisons meaningful.
+
+Next:
+- Push `main` to `origin`.
+- When Della is reachable, run `scripts/della_loop.sh deploy-code main` to
+  initialize/update `/scratch/gpfs/AM43/lz3952/Wan2.2` as a Git checkout and
+  verify the remote commit before launching more jobs.
+
 ## Comparison Summary
 
 ### Noise / Z-Init Experiments
