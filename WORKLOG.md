@@ -1096,8 +1096,11 @@ Change:
 Version Control:
 - branch: `main`
 - base_commit: `7a3ae33`
-- implementation_commit: pending
-- push/pull: pending
+- implementation_commit: `90402c9`
+- push/pull:
+  - pushed `90402c9` to `origin/main`
+  - deployed `90402c9` to Della with `scripts/della_loop.sh deploy-code main`
+  - final worklog-only update will be pushed/deployed after this entry
 - changed_files:
   - `.gitignore`
   - `scripts/della_loop.sh`
@@ -1107,6 +1110,8 @@ Version Control:
   - remote checkout before conversion: `42bf4cf`
   - remote tracked dirty files before conversion:
     `wan/modules/vae2_2.py`, `wan/textimage2video.py`
+  - remote checkout after conversion: `90402c9`
+  - remote tracked status after conversion: clean
 
 Command / Job:
 - command: `scripts/della_loop.sh deploy-code main`
@@ -1116,9 +1121,18 @@ Command / Job:
 - artifacts: remote Git checkout
 
 Result:
-- status: in progress
-- metrics/artifacts: pending local commit, fork push, and Della deploy
-- key evidence: Della SSH returned `della-gpu.princeton.edu` and remote date.
+- status: passed
+- metrics/artifacts:
+  - Della remote HEAD matched local/fork commit
+    `90402c9c49d0ccde23d6d71acc61c3822cffa499`
+  - remote tracked status was clean with `git status --short --untracked-files=no`
+  - runtime paths still existed after conversion:
+    `data`, `runs`, `slurm_outputs`, `Wan2.2-TI2V-5B`, `.venv`
+  - current queue after Della came back still showed pending maintenance/node
+    availability for jobs `9478714` and `9479448_[100-120]`
+- key evidence:
+  - `deploy-code` printed matching remote and expected heads
+  - `scripts/della_loop.sh remote-git-status` returned `main` at `90402c9`
 
 Analysis:
 - The remote tree already had upstream Git history, but the old rsync flow had
@@ -1127,8 +1141,8 @@ Analysis:
   replacement while leaving unrelated untracked runtime outputs alone.
 
 Next:
-- Commit and push the helper fix, deploy to Della, verify remote HEAD and clean
-  tracked status, then record the final commit.
+- Commit and deploy this final worklog update so local, fork, and Della remain
+  aligned before relaunching or monitoring jobs.
 
 ## Comparison Summary
 
