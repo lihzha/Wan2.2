@@ -1073,6 +1073,63 @@ Next:
   initialize/update `/scratch/gpfs/AM43/lz3952/Wan2.2` as a Git checkout and
   verify the remote commit before launching more jobs.
 
+## 2026-06-09 13:47 PDT - Della Git Checkout Conversion
+
+Goal:
+- Convert the existing Della scratch tree from an rsync-contaminated checkout
+  into a clean Git deployment from the fork.
+
+Hypothesis:
+- Della is reachable again, and the scratch tree can be safely reset to the
+  fork commit while preserving untracked runtime state such as checkpoints,
+  caches, runs, and logs.
+
+Change:
+- Confirmed `ssh della-gpu` works.
+- Inspected `/scratch/gpfs/AM43/lz3952/Wan2.2`; it was a Git checkout at
+  upstream `42bf4cf` with many rsync-copied files untracked and two tracked
+  Wan files modified.
+- Updated `scripts/della_loop.sh deploy-code` to use forced checkout for
+  tracked paths during first-time conversion.
+- Added uppercase video and PDF artifact patterns to `.gitignore`.
+
+Version Control:
+- branch: `main`
+- base_commit: `7a3ae33`
+- implementation_commit: pending
+- push/pull: pending
+- changed_files:
+  - `.gitignore`
+  - `scripts/della_loop.sh`
+  - `WORKLOG.md`
+- remote_commit/status:
+  - Della reachable
+  - remote checkout before conversion: `42bf4cf`
+  - remote tracked dirty files before conversion:
+    `wan/modules/vae2_2.py`, `wan/textimage2video.py`
+
+Command / Job:
+- command: `scripts/della_loop.sh deploy-code main`
+- job_id: n/a
+- run_dir: `/scratch/gpfs/AM43/lz3952/Wan2.2`
+- logs: terminal output
+- artifacts: remote Git checkout
+
+Result:
+- status: in progress
+- metrics/artifacts: pending local commit, fork push, and Della deploy
+- key evidence: Della SSH returned `della-gpu.princeton.edu` and remote date.
+
+Analysis:
+- The remote tree already had upstream Git history, but the old rsync flow had
+  placed our development files into it as untracked files. A normal checkout
+  could reject those paths, so the deploy helper must force tracked path
+  replacement while leaving unrelated untracked runtime outputs alone.
+
+Next:
+- Commit and push the helper fix, deploy to Della, verify remote HEAD and clean
+  tracked status, then record the final commit.
+
 ## Comparison Summary
 
 ### Noise / Z-Init Experiments

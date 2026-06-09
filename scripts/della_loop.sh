@@ -111,7 +111,7 @@ fi
 git remote remove origin >/dev/null 2>&1 || true
 git remote add origin "$GIT_PULL_URL"
 git fetch origin "$BRANCH"
-git checkout -B "$BRANCH" FETCH_HEAD
+git checkout -f -B "$BRANCH" FETCH_HEAD
 git reset --hard FETCH_HEAD
 if git lfs version >/dev/null 2>&1; then
   git lfs pull

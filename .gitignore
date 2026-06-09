@@ -30,5 +30,8 @@ checkpoints/
 *.npy
 *.npz
 *.mp4
+*.MP4
 *.avi
 *.mov
+*.MOV
+*.pdf
