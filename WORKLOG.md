@@ -1016,7 +1016,7 @@ Version Control:
 - branch: `main`
 - base_commit: `42bf4cf` (`upstream/main`)
 - implementation_commit: `b99d040`
-- push/pull: fork push pending; Della pull blocked because `ssh della-gpu`
+- push/pull: fork push succeeded; Della pull blocked because `ssh della-gpu`
   still fails with `Connection closed by UNKNOWN port 65535`
 - changed_files:
   - action-adapter implementation, trainers, exporters, tests, and docs
@@ -1025,8 +1025,10 @@ Version Control:
   - `scripts/della_loop.sh`
   - `docs/della_workflow.md`
   - `WORKLOG.md`
-- remote_commit/status: local fork not pushed yet at the time of this entry;
-  Della checkout not reachable
+- remote_commit/status:
+  - `origin/main` verified at `3c5c8f8ee93b5e88ee718d11e2b6141fbf387fb5`
+    before this final worklog update
+  - Della checkout not reachable
 
 Command / Job:
 - command:
@@ -1042,9 +1044,10 @@ Command / Job:
   `rsync-snapshot`
 
 Result:
-- status: passed locally, cluster conversion pending
+- status: passed locally and pushed to fork; cluster conversion pending
 - metrics/artifacts:
   - upstream-based commit `b99d040`
+  - fork worklog/provenance commit `3c5c8f8`
   - no tracked deletions relative to upstream, so upstream sample videos are
     preserved
   - `scripts/della_loop.sh deploy-code` now pushes local `HEAD`, initializes or
@@ -1066,7 +1069,6 @@ Analysis:
   fork comparisons meaningful.
 
 Next:
-- Push `main` to `origin`.
 - When Della is reachable, run `scripts/della_loop.sh deploy-code main` to
   initialize/update `/scratch/gpfs/AM43/lz3952/Wan2.2` as a Git checkout and
   verify the remote commit before launching more jobs.
