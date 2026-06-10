@@ -1230,6 +1230,87 @@ Next:
   only because SSH auth expired.
 - Deploy this worklog-only commit to Della after auth is restored.
 
+## 2026-06-09 22:12 PDT - Local Watch Restart Blocked By Della Auth
+
+Goal:
+- Continue the local watch loop for the active Della overfit job, DROID cache
+  submitter, and post-cache DROID training waiter.
+
+Hypothesis:
+- Della SSH auth had recovered, so a bounded local watcher could resume polling
+  queue state, loss curves, cache counts, and submitter logs.
+
+Change:
+- No code change. Cleaned up a stale inherited local SSH proxy/session before
+  attempting a fresh direct poll.
+
+Version Control:
+- branch: `main`
+- base_commit: `9ec0395d66877658c9dd4daf5c869d09c02d2db9`
+- implementation_commit: pending worklog-only update
+- push/pull: not pushed or deployed yet; Della auth blocked remote pull
+- changed_files:
+  - `WORKLOG.md`
+- remote_commit/status:
+  - last live-verified remote commit before this attempt:
+    `9ec0395d66877658c9dd4daf5c869d09c02d2db9`, clean
+  - current attempt could not run `git rev-parse` on Della because SSH to
+    `della-gpu` failed with `Permission denied (keyboard-interactive)`
+
+Command / Job:
+- command:
+  - local cleanup:
+    `ps ... grep 'ssh .*della|ssh .*tigress'`, then `kill <stale ssh proxy>`
+  - auth checks:
+    `ssh -o BatchMode=yes tigressgateway 'hostname && date'`
+    and `ssh -o BatchMode=yes della-gpu 'hostname && date'`
+  - reachability check:
+    `ssh tigressgateway 'python3 - ... connect(("della-gpu.princeton.edu", 22))'`
+- job_id:
+  - overfit: `9478714`
+  - last observed cache array: `9493108`
+  - remote cache submitter PID: `1871034`
+  - remote DROID training waiter PID: `1883834`
+- run_dir: `/scratch/gpfs/AM43/lz3952/Wan2.2`
+- logs:
+  - `slurm_outputs/action-overfit/out_act-side-fresh25-10k_9478714.log`
+  - `runs/droid_window_plans/train_cache_chunk_submitter_gputest_1024_resume_from_121.log`
+  - `runs/droid_window_plans/action_droid_training_submitter_resume.log`
+- artifacts:
+  - local plots last refreshed at `_cluster/loss_curves/`
+
+Result:
+- status: blocked by Della login authentication
+- metrics/artifacts:
+  - gateway auth works: `tigressgateway.rc.princeton.edu` responded at
+    `Wed Jun 10 01:11:27 AM EDT 2026`.
+  - Della host is reachable from the gateway:
+    `128.112.173.250`, `SSH-2.0-OpenSSH_8.7`.
+  - Della login rejects noninteractive auth:
+    `Permission denied (publickey,keyboard-interactive)`.
+  - no local SSH monitor/proxy process remained after cleanup.
+- key evidence:
+  - direct `ssh -o BatchMode=yes della-gpu 'hostname && date'` failed with
+    `Permission denied (keyboard-interactive)`.
+  - nested gateway-to-Della probe failed with
+    `Permission denied (publickey,keyboard-interactive)` after host-key setup.
+
+Analysis:
+- This is not a Della network or maintenance outage: the login host is
+  reachable and returns an SSH banner. The blocker is local authentication to
+  `della-gpu`, likely an expired or missing keyboard-interactive/Duo session.
+- Last live state before this auth failure remained healthy: overfit job
+  `9478714` was running around step `3460` with recent losses near `0.058`,
+  cache count had reached about `265,724` train windows, and cache submitter
+  array `9493108` was processing shards `169-192`.
+
+Next:
+- Refresh local authentication to `della-gpu`.
+- Restart bounded polling of `9478714`, current cache array, cache count,
+  submitter PIDs/logs, and error scans.
+- Fetch updated `train_log.csv` and cache submitter log, regenerate loss/cache
+  SVGs under `_cluster/loss_curves/`, then commit and deploy this worklog entry.
+
 ## Comparison Summary
 
 ### Noise / Z-Init Experiments
