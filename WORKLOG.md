@@ -6,12 +6,23 @@ retrospectively on 2026-06-09 from local code, fetched cluster artifacts under
 maintenance during creation, so final queue state after the last observed
 snapshot is not live-verified here.
 
-## Current State As Of 2026-06-09
+## Current Handoff State As Of 2026-06-10 13:41 PDT
 
 Goal:
 - Learn an action/I0-conditioned adapter for frozen Wan2.2 that can control
   generated videos without fine-tuning the backbone, with training/eval
   guidance scale aligned and with fresh initial diffusion noise.
+
+Version control:
+- local branch: `main`
+- local/fork latest documented commit before handoff:
+  `79554b590d0579be0d2dbe94bd0e74dc1ea5f7ff`
+- Della remote checkout was last live-verified and deployed at the same commit
+  at `2026-06-10 04:30:59 EDT` / `2026-06-10 01:30:59 PDT`.
+- Final handoff refresh at `2026-06-10 13:41 PDT` could not live-verify Della
+  because SSH auth failed from this Codex process:
+  `tigressgateway` returned `Permission denied (publickey,keyboard-interactive)`
+  and `della-gpu` returned `Connection closed by UNKNOWN port 65535`.
 
 Current conclusions:
 - Fixed-noise or 1-step overfit is too easy and does not diagnose the real
@@ -23,32 +34,70 @@ Current conclusions:
 - The side adapter is the strongest implemented adapter so far. It reuses Wan
   hidden states and timestep/noisy-latent/I0 processing and injects action
   through trainable residual branches.
-- Side adapter can overfit one sample at 1 diffusion step very strongly. A
-  25-step fresh-noise pilot also gives stable random-noise eval near the pilot
-  train loss, but needs a longer 10k-step run for a real overfit test.
-- Full DROID training is blocked on cache completion and Della maintenance, not
-  on trainer correctness: a one-step H200 DROID trainer smoke completed.
+- Side adapter can overfit one sample at 1 diffusion step very strongly. The
+  active 25-step fresh-noise overfit run has occasional one-step loss/gradient
+  spikes but immediately recovers; robust recent loss statistics remained near
+  `0.062` in the last verified monitor window.
+- The first DROID dataset training attempt using the full planned cache is
+  waiting for cache completion via a remote waiter. A second DROID dataset
+  training attempt using a fixed snapshot of the current partial cache has
+  already been submitted and is waiting for the `ailab` slot.
 
-Latest known remote state before Della maintenance blocked SSH:
-- Overfit 10k job `9478714`, run
-  `runs/action_overfit_ep0_v0_side_bn512h8_L0-29_fresh_25step_10k_lr5e-5`,
-  was pending on `ailab` due maintenance / unavailable nodes.
-- DROID val window cache complete: `14,636` windows.
-- DROID train window cache reached `140,679` windows.
-- DROID train cache remote submitter PID was `2821907`.
-- Active/pending 1024-shard GPU-test cache array was `9479448_[100-120]`.
-- Post-cache training submitter PID was previously `2661285`, waiting for
-  train `1,440,554` and val `14,636` cache counts, then set to submit DROID
-  smoke and full 10k training.
+Latest live-verified Della state:
+- Last successful live check: `2026-06-10 04:30:59 EDT`
+  / `2026-06-10 01:30:59 PDT`.
+- Remote project path: `/scratch/gpfs/AM43/lz3952/Wan2.2`.
+- Remote commit: `79554b590d0579be0d2dbe94bd0e74dc1ea5f7ff`.
+- Overfit job `9478714`, `act-side-fresh25-10k`, was running on
+  `della-i23g1` with elapsed `11:39:39`.
+- Current-cache DROID smoke job `9497851`, `act-droid-cur-smoke`, was pending
+  with reason `QOSMaxJobsPerUserLimit`.
+- Current-cache DROID full job `9497852`, `act-droid-cur-10k`, was pending
+  with reason `Dependency` on `afterok:9497851`.
+- DROID train-cache array `9497638` for shards `289-312` was active on
+  `gpu-test`; tasks `295-297` were running and `298-312` were pending on the
+  array task limit.
+- DROID window cache count was `417,594` train windows and `14,636` val
+  windows.
+- Current-cache DROID training snapshot manifest:
+  `runs/droid_window_plans/train_current_cache_414672_20260610_042850.jsonl`
+  with `414,835` train names.
 
 Key artifact paths:
 - Local fetched artifacts: `_cluster/`
-- Random-eval videos for 25-step fresh-noise pilot:
+- Local latest overfit/cache plots:
+  - `_cluster/loss_curves/side_fresh25_10k_loss_current.svg`
+  - `_cluster/loss_curves/droid_cache_progress_current.svg`
+  - `_cluster/loss_curves/current_monitor_summary.json`
+- Remote 25-step fresh-noise overfit:
+  `runs/action_overfit_ep0_v0_side_bn512h8_L0-29_fresh_25step_10k_lr5e-5`
+- Remote current-cache DROID smoke:
+  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_currentcache_414835_20260610_042850_smoke`
+- Remote current-cache DROID full:
+  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_currentcache_414835_20260610_042850_10k`
+- Remote cache submitter log:
+  `runs/droid_window_plans/train_cache_chunk_submitter_gputest_1024_resume_from_121.log`
+- Remote full-cache training waiter log:
+  `runs/droid_window_plans/action_droid_training_submitter_resume.log`
+- Random-eval videos for previous 25-step fresh-noise pilot:
   `_cluster/action_overfit_ep0_v0_side_bn512h8_L0-29_fresh_25step_pilot/videos_best_random_eval_s1000_1003/`
-- Loss curve for 25-step pilot:
-  `_cluster/loss_curves/side_fresh25_pilot_loss.svg.png`
 - DROID planning scripts and trainers are in `scripts/` and Slurm wrappers in
   the repo root.
+
+Immediate next checks for the next agent:
+1. Refresh user SSH/auth first. Use normal `ssh della-gpu`, not
+   `ssh -o BatchMode=yes della-gpu`, because the working config relies on
+   keyboard-interactive auth and ControlMaster.
+2. Check `squeue -u $(whoami)` and specifically jobs `9478714`, `9497851`,
+   `9497852`, and the current `droid-train-cache-*` array.
+3. If `9478714` completed, inspect its logs and metrics, then export/fetch
+   random-noise eval videos for the best/latest checkpoint.
+4. If `9497851` started, inspect its stdout/stderr and verify five smoke steps
+   plus validation. If it passed, monitor `9497852`; if it failed, debug before
+   allowing the full run.
+5. Continue watching the train-cache submitter until the full planned cache is
+   complete; then the existing waiter should submit the full-cache smoke and
+   10k jobs.
 
 ## 2026-06-08 - Initial Della Development Loop
 
@@ -1681,21 +1730,24 @@ Next:
 
 ## Immediate Resume Checklist
 
-When Della returns:
+See `HANDOFF.md` for the concise handoff. At minimum:
 
-1. Check SSH and maintenance state:
-   `ssh della-gpu 'hostname && date && squeue -u $(whoami) -o "%.18i %.9P %.32j %.8T %.20M %.60R"'`
-2. Check cache counts:
-   `find data/droid_cache_windows_v0/train -mindepth 1 -maxdepth 1 -type d | wc -l`
-   and same for val.
-3. Check remote submitters:
-   `pgrep -af submit_droid_train_cache_chunks`,
-   `pgrep -af wait_and_submit_action_droid_training`.
-4. Tail:
-   `runs/droid_window_plans/train_cache_chunk_submitter_gputest_1024.log`,
-   `runs/droid_window_plans/action_droid_training_submitter.log`.
-5. Inspect `9479448` and `9478714` with `squeue`/`scontrol`/`sacct`.
-6. If cache completes, verify DROID smoke/full training submission and plot
-   `train_log.csv`/`val_log.csv`.
-7. If 10k overfit completes, fetch logs, plot loss, export random eval videos,
-   and record remote/local video paths.
+1. Refresh SSH/auth with normal `ssh della-gpu`; do not force `BatchMode=yes`.
+2. Verify remote commit and queue:
+   `cd /scratch/gpfs/AM43/lz3952/Wan2.2 && git rev-parse HEAD && squeue -u $(whoami)`.
+3. Inspect jobs:
+   - `9478714` overfit 10k
+   - `9497851` current-cache DROID smoke
+   - `9497852` dependent current-cache DROID 10k
+   - current `droid-train-cache-*` array after `9497638`
+4. Check cache counts under `data/droid_cache_windows_v0/{train,val}`.
+5. Tail logs:
+   - `runs/action_overfit_ep0_v0_side_bn512h8_L0-29_fresh_25step_10k_lr5e-5/train_log.csv`
+   - `slurm_outputs/action-droid/out_act-droid-cur-smoke_9497851.log`
+   - `slurm_outputs/action-droid/err_act-droid-cur-smoke_9497851.log`
+   - `runs/droid_window_plans/train_cache_chunk_submitter_gputest_1024_resume_from_121.log`
+   - `runs/droid_window_plans/action_droid_training_submitter_resume.log`
+6. If `9478714` completed, export/fetch random-noise eval videos and record
+   final paths.
+7. If `9497851` passed, monitor `9497852`. If `9497851` failed, debug before
+   allowing the full run to proceed.
