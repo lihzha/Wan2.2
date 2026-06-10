@@ -193,6 +193,80 @@ Next:
 - Continue cache submitter monitoring until `1440554/1440554` train windows are
   present and the full-cache waiter submits its smoke/10k jobs.
 
+## 2026-06-10 14:46 PDT - SSH Restored And DROID Monitor Resumed
+
+Goal:
+- Resume active monitoring after a transient SSH failure interrupted the Della
+  loop.
+
+Hypothesis:
+- The failure was authentication/session infrastructure only; the active DROID
+  10k training and cache precompute jobs likely continued on Della.
+
+Change:
+- Retried normal `ssh della-gpu` after the user fixed SSH.
+- Refreshed queue state, remote git state, DROID train/val logs, Slurm stderr,
+  cache submitter tail, and live cache counts.
+- Fetched updated DROID 10k train log and action-droid Slurm logs into ignored
+  local `_cluster/` paths.
+
+Version Control:
+- branch: `main`
+- base_commit: `63752a13cc51d1d40e4a56a3af4693ceb5c0f6b4`
+- implementation_commit: pending worklog-only update
+- push/pull: local worklog commit `63752a1` was already pushed; Della remains
+  at code commit `79554b590d0579be0d2dbe94bd0e74dc1ea5f7ff` because active
+  jobs are running and the newer commits are monitoring documentation.
+- changed_files: `WORKLOG.md`; ignored fetched artifacts under `_cluster/`
+- remote_commit/status: `79554b590d0579be0d2dbe94bd0e74dc1ea5f7ff`, untracked
+  `6/` and `Wan2.2-TI2V-5B/`.
+
+Command / Job:
+- command:
+  `ssh della-gpu 'hostname && date && cd /scratch/gpfs/AM43/lz3952/Wan2.2 && ...'`;
+  `rsync` DROID 10k CSV/log files; live cache count via `find ... | wc -l`
+- job_id: monitored existing `9497852` and cache array `9520633`
+- run_dir:
+  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_currentcache_414835_20260610_042850_10k`
+- logs:
+  `_cluster/slurm_outputs/action-droid/out_act-droid-cur-10k_9497852.log`,
+  `_cluster/slurm_outputs/action-droid/err_act-droid-cur-10k_9497852.log`
+- artifacts:
+  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_currentcache_414835_20260610_042850_10k/{train_log.csv,val_log.csv}`
+
+Result:
+- status: in_progress
+- metrics/artifacts:
+  - SSH succeeded at `Wed Jun 10 05:46:37 PM EDT 2026`.
+  - `9497852` was still running on `della-i23g3` with elapsed `10:19:25`.
+  - Latest fetched DROID train step was `4160`, loss `0.2305805`.
+  - Recent 25 logged train losses: mean `0.251804`, median `0.225247`, max
+    `0.604854`, min `0.115840`; recent 25 grad norm mean `5.19643`, max
+    `31.1511`.
+  - Validation losses: step `1000` `0.336866`, step `2000` `0.265357`,
+    step `3000` `0.233172`, step `4000` `0.232768`.
+  - Current stderr still only showed AMP deprecation warnings and checkpoint
+    load progress; no traceback/OOM.
+  - Cache array `9520633` for shards `649-672` was active. Live cache count:
+    `934620/1440554` train windows and `14636/14636` val windows.
+- key evidence: live SSH snapshot plus refreshed local `_cluster/` logs.
+
+Analysis:
+- The DROID run survived the SSH interruption and continues normally. The
+  validation curve improved strongly through step 3000 and then plateaued
+  between steps 3000 and 4000, so the next important signal is step 5000.
+- The train curve remains noisy, with occasional spikes, but the median recent
+  loss and grad norms do not indicate divergence.
+- Cache generation is progressing steadily but is still short of the full
+  planned train cache.
+
+Next:
+- Continue monitoring `9497852` until step 5000 validation and then reassess
+  whether the plateau persists.
+- Continue cache submitter monitoring until the full planned cache completes.
+- Keep the overfit random-noise export pending until the user confirms launching
+  that new Slurm job.
+
 ## 2026-06-08 - Initial Della Development Loop
 
 Goal:
