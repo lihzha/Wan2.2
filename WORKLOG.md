@@ -99,6 +99,100 @@ Immediate next checks for the next agent:
    complete; then the existing waiter should submit the full-cache smoke and
    10k jobs.
 
+## 2026-06-10 13:50 PDT - Resume After Handoff Pull
+
+Goal:
+- Resume the Della monitoring loop after pulling the new handoff commit and
+  verify the active overfit/DROID/cache state before launching any new jobs.
+
+Hypothesis:
+- Della SSH/auth is now healthy, the 10k one-sample overfit likely completed
+  cleanly, and the current-cache DROID run should be monitored before any
+  further scale-up or export work.
+
+Change:
+- Pulled local `main` from `79554b590d0579be0d2dbe94bd0e74dc1ea5f7ff` to
+  `4a28dc358074ffebff091df945df1104d1556d18`.
+- Created local ignored `_cluster/` artifact folders and fetched small JSON,
+  CSV, and Slurm log files for the completed overfit, current-cache smoke, and
+  current-cache 10k run. Checkpoints and videos were not fetched.
+- No code changes and no new Slurm jobs launched in this entry.
+
+Version Control:
+- branch: `main`
+- base_commit: `4a28dc358074ffebff091df945df1104d1556d18`
+- implementation_commit: pending worklog-only update
+- push/pull: pulled local fork; Della checkout not pulled yet because the
+  remote is actively running jobs and the new local commit is handoff/worklog
+  documentation only.
+- changed_files: `WORKLOG.md`; ignored fetched artifacts under `_cluster/`
+- remote_commit/status: Della `/scratch/gpfs/AM43/lz3952/Wan2.2` remains at
+  `79554b590d0579be0d2dbe94bd0e74dc1ea5f7ff` with untracked `6/` and
+  `Wan2.2-TI2V-5B/`.
+
+Command / Job:
+- command: `git pull --ff-only`; `ssh della-gpu 'hostname && date'`; remote
+  `squeue`, `sacct`, log tails, cache counts; `rsync` small run metadata/logs
+  to `_cluster/`
+- job_id: monitored existing jobs `9478714`, `9497851`, `9497852`,
+  `9518561`
+- run_dir:
+  - `runs/action_overfit_ep0_v0_side_bn512h8_L0-29_fresh_25step_10k_lr5e-5`
+  - `runs/action_droid_side_bn512h8_L0-29_fresh_25step_currentcache_414835_20260610_042850_smoke`
+  - `runs/action_droid_side_bn512h8_L0-29_fresh_25step_currentcache_414835_20260610_042850_10k`
+- logs:
+  - `_cluster/slurm_outputs/action-overfit/out_act-side-fresh25-10k_9478714.log`
+  - `_cluster/slurm_outputs/action-overfit/err_act-side-fresh25-10k_9478714.log`
+  - `_cluster/slurm_outputs/action-droid/out_act-droid-cur-smoke_9497851.log`
+  - `_cluster/slurm_outputs/action-droid/err_act-droid-cur-smoke_9497851.log`
+  - `_cluster/slurm_outputs/action-droid/out_act-droid-cur-10k_9497852.log`
+  - `_cluster/slurm_outputs/action-droid/err_act-droid-cur-10k_9497852.log`
+- artifacts:
+  - `_cluster/action_overfit_ep0_v0_side_bn512h8_L0-29_fresh_25step_10k_lr5e-5/{config.json,summary.json,train_log.csv}`
+  - `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_currentcache_414835_20260610_042850_smoke/{config.json,summary.json,train_log.csv,val_log.csv}`
+  - `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_currentcache_414835_20260610_042850_10k/{config.json,train_log.csv,val_log.csv}`
+
+Result:
+- status: in_progress
+- metrics/artifacts:
+  - SSH succeeded: `della-gpu.princeton.edu`, `Wed Jun 10 04:46:37 PM EDT 2026`.
+  - Overfit job `9478714` completed `0:0` after `23:32:23`; final log line
+    reports `done best=0.040368 final=0.052908`.
+  - Overfit CSV has `501` logged rows through step `10000`; logged-loss min
+    `0.0405246`, last `0.0540686`, recent-25 mean `0.0538273`, recent-25
+    median `0.0537409`. Summary best loss is `0.0403681`.
+  - Smoke job `9497851` completed `0:0` and ran 5 train steps plus validation;
+    summary best/latest val loss `4.7875304`.
+  - Full current-cache DROID job `9497852` is running on `della-i23g3`; fetched
+    logs were at step `3780`, with recent-25 train mean `0.230979`, recent-25
+    median `0.218067`, and val losses `0.336866`, `0.265357`, `0.233172` at
+    steps `1000`, `2000`, `3000`.
+  - Cache array `9518561` is active on `gputest` shards `625-648`; live count
+    was `894928/1440554` train windows and `14636/14636` val windows. Submitter
+    log tail showed `886264/1440554` train at `2026-06-10 16:35:56` EDT.
+  - Error scan only surfaced an older `9479259` DROID wrapper smoke OOM; no
+    current `9497851`/`9497852` traceback was observed.
+- key evidence: local `_cluster/` JSON/CSV/log files listed above, plus
+  `sacct` showing `9478714` and `9497851` completed and `9497852` running.
+
+Analysis:
+- The 10k overfit improved substantially over the 100-step pilot and ended
+  stably, but final fixed-seed eval is worse than the best train step, so
+  random-noise video export is still required before judging qualitative
+  control.
+- The current-cache DROID run has passed the smoke gate and early validation is
+  improving, making cancellation/debugging unnecessary at this point.
+- The cache builder is making steady progress but the full planned cache is not
+  complete, so the full-cache waiter should remain under observation.
+
+Next:
+- Submit the overfit random-noise export with `run_action_conditioned_export.sh`
+  after user confirmation, then fetch and inspect MP4s plus `metrics.json`.
+- Continue monitoring `9497852` through completion and inspect final train/val
+  curves, summary/checkpoints, and any generated artifacts.
+- Continue cache submitter monitoring until `1440554/1440554` train windows are
+  present and the full-cache waiter submits its smoke/10k jobs.
+
 ## 2026-06-08 - Initial Della Development Loop
 
 Goal:
