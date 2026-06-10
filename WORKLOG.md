@@ -1144,6 +1144,92 @@ Next:
 - Commit and deploy this final worklog update so local, fork, and Della remain
   aligned before relaunching or monitoring jobs.
 
+## 2026-06-09 20:42 PDT - Monitoring Loop Restart
+
+Goal:
+- Resume active monitoring after Della SSH came back and keep both the overfit
+  and full DROID training pipeline moving.
+
+Hypothesis:
+- The previously pending Slurm jobs should resume after maintenance, and the
+  DROID train cache submitter needs to be restarted from shard `121` because
+  the pre-maintenance submitter stopped after array `9479448`.
+
+Change:
+- Verified Della checkout was clean at `f5083b2`.
+- Confirmed overfit job `9478714` was running on `della-i23g1`.
+- Confirmed cache array `9479448_100-120` completed cleanly.
+- Restarted remote cache submitter from shard `121` with `gpu-test`, chunk size
+  `24`, concurrency `3`, total shards `1024`.
+- Restarted the cache-gated DROID training waiter.
+
+Version Control:
+- branch: `main`
+- base_commit: `f5083b2`
+- implementation_commit: no code change
+- push/pull: local/fork/Della were aligned at `f5083b2` before monitoring;
+  this worklog-only update is pushed to GitHub but not deployed to Della yet
+  because SSH auth expired again during artifact fetch
+- changed_files:
+  - `WORKLOG.md`
+- remote_commit/status:
+  - Della checkout: `f5083b2`, tracked status clean at monitor start
+  - SSH auth later failed with `Permission denied` on `tigressgateway`
+
+Command / Job:
+- command:
+  - `nohup env ... START_SHARD=121 ... bash scripts/submit_droid_train_cache_chunks.sh`
+  - `nohup env POLL_SECONDS=900 ... bash scripts/wait_and_submit_action_droid_training.sh`
+  - bounded polling of `squeue`, `sacct`, cache counts, and overfit loss
+- job_id:
+  - overfit: `9478714`
+  - resumed cache array: `9491200` for shards `121-144`
+  - remote cache submitter PID: `1871034`
+  - remote DROID training waiter PID: `1883834`
+- run_dir: `/scratch/gpfs/AM43/lz3952/Wan2.2`
+- logs:
+  - `slurm_outputs/action-overfit/out_act-side-fresh25-10k_9478714.log`
+  - `runs/droid_window_plans/train_cache_chunk_submitter_gputest_1024_resume_from_121.log`
+  - `runs/droid_window_plans/action_droid_training_submitter_resume.log`
+- artifacts:
+  - overfit run
+    `runs/action_overfit_ep0_v0_side_bn512h8_L0-29_fresh_25step_10k_lr5e-5`
+  - DROID cache under `data/droid_cache_windows_v0`
+
+Result:
+- status: active, locally blocked from further polling by SSH auth
+- metrics/artifacts:
+  - overfit was healthy at step `2620/10000`, loss `0.054346`, recent mean
+    about `0.073`; H200 GPU was active and checkpoints existed.
+  - cache count increased from `170,221` to `178,752` during the monitor
+    window; validation remained complete at `14,636`.
+  - cache array `9491200` was progressing: shards `121-124` and `126`
+    completed cleanly by the last poll, while `125`, `127`, and `128` were
+    running.
+  - DROID training waiter was running and correctly waiting for
+    `1,440,554` train cache windows.
+- key evidence:
+  - `sacct` showed `9478714` running and cache tasks returning
+    `COMPLETED|0:0`.
+  - `train_log.csv` was advancing from step `2560` to `2620`.
+
+Analysis:
+- The overfit loss curve is stable enough to continue. A single spike around
+  step `2240` is not enough to justify an LR change because subsequent losses
+  returned to roughly `0.05`.
+- The cache pipeline is now moving again. The old submit-limit error in
+  `train_cache_chunk_submitter_gputest_1024.nohup.log` is historical, not from
+  the resumed submitter.
+- The current blocker is local SSH/Duo authentication, not the remote jobs.
+  The remote submitters should continue without this local session.
+
+Next:
+- Refresh SSH auth to `tigressgateway`/`della-gpu`.
+- After auth works, poll `9491200`, `9478714`, and the two submitter logs.
+- Fetch and plot the current overfit `train_log.csv`; the fetch attempt failed
+  only because SSH auth expired.
+- Deploy this worklog-only commit to Della after auth is restored.
+
 ## Comparison Summary
 
 ### Noise / Z-Init Experiments
