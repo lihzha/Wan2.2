@@ -267,6 +267,75 @@ Next:
 - Keep the overfit random-noise export pending until the user confirms launching
   that new Slurm job.
 
+## 2026-06-10 16:54 PDT - Current-Cache DROID Step 5000 Validation
+
+Goal:
+- Check whether the current-cache DROID 10k run recovers from the apparent
+  step-3000 to step-4000 validation plateau.
+
+Hypothesis:
+- If the plateau was only a temporary flat section, step-5000 validation should
+  improve below the step-4000 value without train loss or gradients diverging.
+
+Change:
+- Continued read-only monitoring only.
+- Fetched updated DROID 10k train/val CSVs and Slurm logs into ignored
+  `_cluster/` paths.
+
+Version Control:
+- branch: `main`
+- base_commit: `90d2b3de84b1b78f194802560758f191db265db3`
+- implementation_commit: pending worklog-only update
+- push/pull: local monitoring docs are pushed; Della still running active jobs
+  on code commit `79554b590d0579be0d2dbe94bd0e74dc1ea5f7ff`.
+- changed_files: `WORKLOG.md`; ignored fetched artifacts under `_cluster/`
+- remote_commit/status: not re-pulled while active jobs are running.
+
+Command / Job:
+- command: `ssh della-gpu ... tail train_log.csv val_log.csv ...`; `rsync`
+  DROID 10k CSV/log files
+- job_id: monitored existing `9497852` and cache array `9526326`
+- run_dir:
+  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_currentcache_414835_20260610_042850_10k`
+- logs:
+  `_cluster/slurm_outputs/action-droid/out_act-droid-cur-10k_9497852.log`,
+  `_cluster/slurm_outputs/action-droid/err_act-droid-cur-10k_9497852.log`
+- artifacts:
+  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_currentcache_414835_20260610_042850_10k/{train_log.csv,val_log.csv}`
+
+Result:
+- status: in_progress
+- metrics/artifacts:
+  - `9497852` was running on `della-i23g3` at `Wed Jun 10 07:54:45 PM EDT`
+    with elapsed `12:27:33`.
+  - Step `5000` train loss `0.201143`.
+  - Validation losses: step `1000` `0.336866`, step `2000` `0.265357`,
+    step `3000` `0.233172`, step `4000` `0.232768`, step `5000`
+    `0.222377`.
+  - Last 50 logged train losses: mean `0.238912`, median `0.223288`, min
+    `0.126937`, max `0.553217`.
+  - Last 50 grad norms: mean `9.33277`, max `153.893`. Recent isolated grad
+    spikes did not coincide with loss divergence.
+  - Current stderr still only showed AMP deprecation warnings and checkpoint
+    load progress; no traceback/OOM.
+  - Cache generation advanced to array `9526326` for shards `721-744`, with
+    `721-723` running at the snapshot.
+- key evidence: refreshed local train/val CSVs and Slurm logs under
+  `_cluster/`.
+
+Analysis:
+- The validation plateau did not persist: step-5000 validation improved by
+  about `0.01039` absolute from step 4000 and is the best validation so far.
+- Train loss remains noisy due sample variability, with occasional gradient
+  spikes, but there is no sustained upward trend, NaN, OOM, or traceback.
+- The run should continue to the next validation checkpoint. Current-cache
+  training is producing a real signal and should not be canceled.
+
+Next:
+- Continue monitoring `9497852` through step `6000` validation.
+- Continue cache monitoring; full planned cache is still incomplete.
+- After `9497852` completes, inspect final train/val curves and checkpoints.
+
 ## 2026-06-08 - Initial Della Development Loop
 
 Goal:
