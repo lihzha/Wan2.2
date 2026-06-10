@@ -1559,6 +1559,92 @@ Next:
 - If cache reaches the train target, verify the waiter submits DROID smoke/full
   training and monitor those curves.
 
+## 2026-06-10 01:30 PDT - Current-Cache DROID Training Submitted
+
+Goal:
+- Start DROID side-adapter training using the cache available now, without
+  waiting for the full planned `1,440,554` train-window cache.
+
+Hypothesis:
+- A fixed snapshot manifest over currently materialized cache directories lets
+  training start safely while the cache submitter continues in the background.
+
+Change:
+- No code change. Created a remote snapshot manifest from existing train cache
+  directories older than two minutes to avoid directories being actively
+  written by cache jobs.
+
+Version Control:
+- branch: `main`
+- base_commit: `3ded7bd2add2bc1a29b9390b987d02549db43f54`
+- implementation_commit: pending worklog-only update
+- push/pull: code already deployed to Della at `3ded7bd2add2bc1a29b9390b987d02549db43f54`
+- changed_files:
+  - `WORKLOG.md`
+- remote_commit/status:
+  - remote commit at submission: `3ded7bd2add2bc1a29b9390b987d02549db43f54`
+
+Command / Job:
+- command:
+  - create snapshot manifest from
+    `data/droid_cache_windows_v0/train` directories with `mtime > 2min`
+  - submit smoke:
+    `sbatch --time=00:30:00 --job-name=act-droid-cur-smoke ... run_action_conditioned_droid.sh`
+  - submit 10k full run:
+    `sbatch --time=36:00:00 --dependency=afterok:9497851 --job-name=act-droid-cur-10k ... run_action_conditioned_droid.sh`
+- job_id:
+  - smoke: `9497851`
+  - full 10k: `9497852`, dependency `afterok:9497851`
+  - still-running overfit occupying `ailab` slot: `9478714`
+- run_dir: `/scratch/gpfs/AM43/lz3952/Wan2.2`
+- logs:
+  - `slurm_outputs/action-droid/out_act-droid-cur-smoke_9497851.log`
+  - `slurm_outputs/action-droid/err_act-droid-cur-smoke_9497851.log`
+  - `slurm_outputs/action-droid/out_act-droid-cur-10k_9497852.log`
+  - `slurm_outputs/action-droid/err_act-droid-cur-10k_9497852.log`
+- artifacts:
+  - snapshot manifest:
+    `runs/droid_window_plans/train_current_cache_414672_20260610_042850.jsonl`
+  - snapshot summary:
+    `runs/droid_window_plans/train_current_cache_414672_20260610_042850.summary.json`
+  - smoke output:
+    `runs/action_droid_side_bn512h8_L0-29_fresh_25step_currentcache_414835_20260610_042850_smoke`
+  - full output:
+    `runs/action_droid_side_bn512h8_L0-29_fresh_25step_currentcache_414835_20260610_042850_10k`
+
+Result:
+- status: submitted, pending on scheduler
+- metrics/artifacts:
+  - snapshot manifest contains `414,835` train names.
+  - total train cache count at snapshot was about `415,751`; validation cache
+    was complete at `14,636`.
+  - smoke job `9497851` is pending with reason `QOSMaxJobsPerUserLimit` because
+    overfit job `9478714` is still running in `ailab`.
+  - full job `9497852` is pending with reason `Dependency`, as intended.
+- key evidence:
+  - `squeue -j 9497851,9497852,9478714` showed:
+    `9497851 PENDING (QOSMaxJobsPerUserLimit)`,
+    `9497852 PENDING (Dependency)`,
+    `9478714 RUNNING`.
+
+Analysis:
+- The initial checked snapshot implementation used Python `Path.exists()` over
+  hundreds of thousands of directories and was too slow on GPFS, so it was
+  killed and replaced by a `find`-based snapshot. This avoids a code change and
+  is adequate because old directory mtimes exclude actively written cache
+  entries.
+- The training is started from Slurm's perspective but cannot begin execution
+  until the current `ailab` QOS slot frees or the user chooses to cancel the
+  overfit job. Keeping the dependency protects the full run from launching if
+  the smoke fails.
+
+Next:
+- Monitor `9497851`; when it starts, inspect stdout/stderr and verify five
+  smoke steps plus validation complete cleanly.
+- If smoke completes, confirm `9497852` starts and monitor loss/validation.
+- Decide whether to let overfit `9478714` finish or cancel it to prioritize the
+  current-cache DROID training.
+
 ## Comparison Summary
 
 ### Noise / Z-Init Experiments
