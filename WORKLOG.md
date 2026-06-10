@@ -1464,6 +1464,101 @@ Next:
   and error scans.
 - Deploy this worklog entry to Della after SSH is restored.
 
+## 2026-06-10 01:21 PDT - Monitor Loop Resumed Without BatchMode
+
+Goal:
+- Continue monitoring the active overfit job, DROID cache submitter, and
+  post-cache training waiter after confirming that direct `ssh della-gpu`
+  works from the user's terminal.
+
+Hypothesis:
+- The previous local monitor failures were caused by forcing
+  `BatchMode=yes`, which disables the keyboard-interactive path used by the
+  working Della SSH config.
+
+Change:
+- No code change. Changed monitor invocation practice: use normal
+  `ssh della-gpu ...` rather than `ssh -o BatchMode=yes della-gpu ...`.
+
+Version Control:
+- branch: `main`
+- base_commit: `a4cd8a99f45943ce50fe04b5e7ea90fec716b0fc`
+- implementation_commit: pending worklog-only update
+- push/pull: deployed `a4cd8a99f45943ce50fe04b5e7ea90fec716b0fc` to Della
+  before monitoring
+- changed_files:
+  - `WORKLOG.md`
+- remote_commit/status:
+  - remote commit: `a4cd8a99f45943ce50fe04b5e7ea90fec716b0fc`
+  - remote tracked status clean; untracked scratch/model directories remain
+    `6/`, `Wan2.2-TI2V-5B/`
+
+Command / Job:
+- command:
+  - `ssh -o ConnectTimeout=20 della-gpu 'hostname && date'`
+  - `ssh -G della-gpu` to inspect auth/control settings
+  - `scripts/della_loop.sh deploy-code main`
+  - two bounded local monitor loops polling queue, cache counts, overfit
+    `train_log.csv`, submitter/waiter tails, and error scans
+  - `rsync` fetched only small CSV/log artifacts for local plots
+- job_id:
+  - overfit: `9478714`
+  - completed cache array: `9497106` for shards `265-288`
+  - current cache array: `9497638` for shards `289-312`
+  - remote cache submitter PID: `1871034`
+  - remote DROID training waiter PID: `1883834`
+- run_dir: `/scratch/gpfs/AM43/lz3952/Wan2.2`
+- logs:
+  - `slurm_outputs/action-overfit/out_act-side-fresh25-10k_9478714.log`
+  - `runs/droid_window_plans/train_cache_chunk_submitter_gputest_1024_resume_from_121.log`
+  - `runs/droid_window_plans/action_droid_training_submitter_resume.log`
+- artifacts:
+  - `_cluster/loss_curves/side_fresh25_10k_loss_current.svg`
+  - `_cluster/loss_curves/droid_cache_progress_current.svg`
+  - `_cluster/loss_curves/current_monitor_summary.json`
+
+Result:
+- status: active and healthy
+- metrics/artifacts:
+  - `ssh della-gpu` succeeded without `BatchMode`; `ssh -G` showed
+    `kbdinteractiveauthentication yes`, `passwordauthentication yes`,
+    `controlmaster auto`, and control path
+    `/Users/lzha/.ssh/sockets/22-della-gpu.princeton.edu-lz3952`.
+  - overfit `9478714` remains running on `della-i23g1`; latest local fetched
+    log reached step `4840/10000`, loss `0.0643683`.
+  - recent-25 loss mean is inflated by one prior spike at step `4620`, but
+    recent-25 median is `0.0624064` and clean mean excluding loss `>0.2` is
+    `0.0625621`.
+  - cache advanced from about `393,204` to direct count `408,643` during the
+    monitor window; waiter log reached `400,666/1,440,554` train windows and
+    `14,636/14,636` val windows.
+  - cache array `9497106` completed cleanly and the submitter launched
+    `9497638` for shards `289-312`.
+- key evidence:
+  - submitter log line:
+    `[2026-06-10 04:17:14] job 9497106 completed cleanly`.
+  - no current traceback/OOM/failure lines appeared in the error scan.
+
+Analysis:
+- The Della auth issue was self-inflicted by `BatchMode=yes`; future monitor
+  commands should use the normal SSH config so keyboard-interactive and
+  ControlMaster can work.
+- The overfit training still does not call for an LR/batch-size change. Spikes
+  are occasional and recover immediately under gradient clipping. The robust
+  loss statistics remain flat near `0.062`, so changing LR mid-run would reduce
+  interpretability of this 10k-step overfit test.
+- Cache generation is progressing monotonically under the `gpu-test` array
+  limit. Disk free space was about `1.2T`, still enough for the planned
+  remaining cache at the current scale.
+
+Next:
+- Continue bounded polling of `9478714`, `9497638`, cache counts, and error
+  scans.
+- If overfit completes, generate/fetch random-noise eval videos and record
+  final paths.
+- If cache reaches the train target, verify the waiter submits DROID smoke/full
+  training and monitor those curves.
+
 ## Comparison Summary
 
 ### Noise / Z-Init Experiments
