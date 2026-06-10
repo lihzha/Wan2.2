@@ -1311,6 +1311,90 @@ Next:
 - Fetch updated `train_log.csv` and cache submitter log, regenerate loss/cache
   SVGs under `_cluster/loss_curves/`, then commit and deploy this worklog entry.
 
+## 2026-06-09 23:47 PDT - Della Watch Resumed
+
+Goal:
+- Resume the local watch loop after Della SSH authentication was restored.
+
+Hypothesis:
+- The remote submitters continued correctly while local auth was unavailable,
+  so the next local poll should show monotonic cache progress and a stable
+  overfit loss curve.
+
+Change:
+- No code change. Deployed the previous worklog-only commit to Della and
+  refreshed local ignored monitor artifacts.
+
+Version Control:
+- branch: `main`
+- base_commit: `60f7a585d385bbd2ee0ec27c8ed50bf4072ebf62`
+- implementation_commit: pending worklog-only update
+- push/pull: `scripts/della_loop.sh deploy-code main` fast-forwarded Della to
+  `60f7a585d385bbd2ee0ec27c8ed50bf4072ebf62`
+- changed_files:
+  - `WORKLOG.md`
+- remote_commit/status:
+  - remote commit: `60f7a585d385bbd2ee0ec27c8ed50bf4072ebf62`
+  - remote tracked status clean; untracked model/scratch directories present:
+    `6/`, `Wan2.2-TI2V-5B/`
+
+Command / Job:
+- command:
+  - `scripts/della_loop.sh deploy-code main`
+  - repeated bounded polls of `squeue`, cache directory counts, overfit
+    `train_log.csv`, submitter logs, `sacct`, and error scans
+  - `rsync` fetched only small CSV/log artifacts for local plots
+- job_id:
+  - overfit: `9478714`
+  - cache array completed: `9495400` for shards `217-240`
+  - current cache array: `9496241` for shards `241-264`
+  - remote cache submitter PID: `1871034`
+  - remote DROID training waiter PID: `1883834`
+- run_dir: `/scratch/gpfs/AM43/lz3952/Wan2.2`
+- logs:
+  - `slurm_outputs/action-overfit/out_act-side-fresh25-10k_9478714.log`
+  - `runs/droid_window_plans/train_cache_chunk_submitter_gputest_1024_resume_from_121.log`
+  - `runs/droid_window_plans/action_droid_training_submitter_resume.log`
+- artifacts:
+  - local loss plot:
+    `_cluster/loss_curves/side_fresh25_10k_loss_current.svg`
+  - local cache progress plot:
+    `_cluster/loss_curves/droid_cache_progress_current.svg`
+  - local summary:
+    `_cluster/loss_curves/current_monitor_summary.json`
+
+Result:
+- status: active and healthy
+- metrics/artifacts:
+  - overfit `9478714` running on `della-i23g1`; latest observed step
+    `4160/10000`, loss `0.0638015`, recent-10 mean `0.0626973`,
+    recent-25 mean `0.0627811`.
+  - DROID cache count advanced to `339,499/1,440,554` train windows by direct
+    directory count; validation remained complete at `14,636`.
+  - cache array `9495400` completed cleanly and the submitter launched
+    `9496241` for shards `241-264`.
+  - scratch filesystem had about `1.3T` available at the latest `df` poll.
+- key evidence:
+  - submitter log line:
+    `[2026-06-10 02:45:13] job 9495400 completed cleanly`
+  - no current traceback/OOM/failure lines appeared in the current error scan.
+
+Analysis:
+- No intervention is needed yet. The overfit loss is stable around `0.06`;
+  the previous large gradient/loss spike appears transient and the optimizer
+  recovered. The LR is already decaying, so lowering LR now would likely slow
+  the ongoing test without clear benefit.
+- Cache generation is continuing at roughly one 24-shard chunk every few
+  minutes under the `gpu-test` array limit. The DROID training waiter remains
+  correctly blocked on the full train-cache target.
+
+Next:
+- Continue polling overfit loss and cache arrays.
+- When overfit `9478714` completes, run/fetch random-noise eval videos and
+  record final video paths.
+- When cache reaches the train target, verify that the waiter submits the DROID
+  smoke/full training jobs and then monitor their loss/validation curves.
+
 ## Comparison Summary
 
 ### Noise / Z-Init Experiments
