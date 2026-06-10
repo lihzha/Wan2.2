@@ -1395,6 +1395,75 @@ Next:
 - When cache reaches the train target, verify that the waiter submits the DROID
   smoke/full training jobs and then monitor their loss/validation curves.
 
+## 2026-06-10 00:03 PDT - Monitor Loop Reblocked By Della Auth
+
+Goal:
+- Continue the local monitor loop for the active overfit job, DROID cache
+  submitter, and post-cache DROID training waiter.
+
+Hypothesis:
+- The SSH session used for the previous resumed watch might still be valid, so
+  a new bounded poll should be able to refresh queue state and loss/cache
+  curves.
+
+Change:
+- No code change.
+
+Version Control:
+- branch: `main`
+- base_commit: `bc8ab2270986002ca7cd77519fb863d43d5c7071`
+- implementation_commit: pending worklog-only update
+- push/pull: local commit can be pushed to GitHub; Della pull is blocked until
+  login auth is refreshed
+- changed_files:
+  - `WORKLOG.md`
+- remote_commit/status:
+  - last live-verified remote commit:
+    `bc8ab2270986002ca7cd77519fb863d43d5c7071`
+  - current remote status could not be refreshed because `ssh della-gpu`
+    failed with `Permission denied (keyboard-interactive)`
+
+Command / Job:
+- command:
+  - `ssh -o BatchMode=yes -o ConnectTimeout=20 della-gpu 'hostname && date ...'`
+  - `ssh -o BatchMode=yes -o ConnectTimeout=15 tigressgateway 'hostname && date'`
+  - gateway-side TCP probe to `della-gpu.princeton.edu:22`
+- job_id:
+  - overfit: `9478714`
+  - last observed cache array: `9496241`
+  - remote cache submitter PID: `1871034`
+  - remote DROID training waiter PID: `1883834`
+- run_dir: `/scratch/gpfs/AM43/lz3952/Wan2.2`
+- logs:
+  - `runs/droid_window_plans/train_cache_chunk_submitter_gputest_1024_resume_from_121.log`
+  - `runs/droid_window_plans/action_droid_training_submitter_resume.log`
+
+Result:
+- status: blocked by Della login authentication
+- metrics/artifacts:
+  - `tigressgateway` remains reachable and authenticated.
+  - `della-gpu.princeton.edu` is reachable from the gateway and returns
+    `SSH-2.0-OpenSSH_8.7`.
+  - direct Della login fails with
+    `Permission denied (keyboard-interactive)`.
+  - no local SSH monitor/proxy processes remained after the failed attempt.
+- key evidence:
+  - gateway command returned
+    `tigressgateway.rc.princeton.edu` at `Wed Jun 10 03:03:15 AM EDT 2026`.
+  - Della TCP probe returned `tcp_connect=ok`.
+
+Analysis:
+- This is the same auth/session failure pattern as the previous blocker: Della
+  is reachable, but noninteractive login is rejected. The remote jobs and
+  remote submitters should continue independently, but local Codex cannot
+  monitor or intervene until Della auth is refreshed.
+
+Next:
+- Refresh local authentication to `della-gpu`.
+- Resume bounded polling of queue, overfit loss, cache counts, submitter logs,
+  and error scans.
+- Deploy this worklog entry to Della after SSH is restored.
+
 ## Comparison Summary
 
 ### Noise / Z-Init Experiments
