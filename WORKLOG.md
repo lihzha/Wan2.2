@@ -336,6 +336,85 @@ Next:
 - Continue cache monitoring; full planned cache is still incomplete.
 - After `9497852` completes, inspect final train/val curves and checkpoints.
 
+## 2026-06-10 17:52 PDT - Launch Overfit And DROID Eval Exports
+
+Goal:
+- Export qualitative random-noise videos for the completed 10k overfit run and
+  for the current DROID best-val checkpoint, then fetch and inspect the videos
+  locally.
+
+Hypothesis:
+- The overfit checkpoint's low latent MSE should produce visibly closer samples
+  than the null baseline under random eval noise.
+- The DROID step-5000 `ckpt_best_val.pt` should show whether the improving
+  validation loss corresponds to usable qualitative control on a held-out val
+  window.
+
+Change:
+- User approved eval launches going forward without further per-job
+  confirmation.
+- Submitted two eval/export Slurm jobs on `ailab`; no code changes.
+- Checked local `viz_open` availability; it is not currently on this shell
+  `PATH`, so if it remains unavailable after fetch, inspect representative
+  frames with the available local image viewer and report exact local video
+  paths.
+
+Version Control:
+- branch: `main`
+- base_commit: `29888ffb86994ea36ceeb0c3fa2173ac2e2ff9f2`
+- implementation_commit: pending worklog-only update
+- push/pull: no source deployment; remote active jobs remain on
+  `79554b590d0579be0d2dbe94bd0e74dc1ea5f7ff`
+- changed_files: `WORKLOG.md`
+- remote_commit/status: not re-pulled while active jobs are running.
+
+Command / Job:
+- command:
+  `sbatch --parsable --time=02:00:00 --job-name=act-overfit-eval-10k --export=ALL,RUN_DIR=runs/action_overfit_ep0_v0_side_bn512h8_L0-29_fresh_25step_10k_lr5e-5,CKPT_NAME=ckpt_best.pt,OUTPUT_DIR=runs/action_overfit_ep0_v0_side_bn512h8_L0-29_fresh_25step_10k_lr5e-5/videos_best_random_eval_s1000_1003,TRIPLETS_ROOT=data/droid_cache/train,INCLUDE_NULL=1,EVAL_NOISE_MODE=random,NUM_EVAL_NOISES=4,EVAL_SEED_START=1000 run_action_conditioned_export.sh`
+- job_id: `9527755`
+- run_dir:
+  `runs/action_overfit_ep0_v0_side_bn512h8_L0-29_fresh_25step_10k_lr5e-5`
+- logs:
+  `slurm_outputs/action-overfit/out_act-overfit-eval-10k_9527755.log`,
+  `slurm_outputs/action-overfit/err_act-overfit-eval-10k_9527755.log`
+- artifacts:
+  `runs/action_overfit_ep0_v0_side_bn512h8_L0-29_fresh_25step_10k_lr5e-5/videos_best_random_eval_s1000_1003/`
+
+Command / Job:
+- command:
+  `sbatch --parsable --job-name=act-droid-eval-s5000 --output=slurm_outputs/action-droid/out_%x_%j.log --error=slurm_outputs/action-droid/err_%x_%j.log --nodes=1 --ntasks=1 --cpus-per-task=8 --mem=180G --gres=gpu:1 --time=02:00:00 --account=am43 --partition=ailab --qos=ailab --wrap="<export_action_conditioned_wan_video.py ... --ckpt_path runs/action_droid_side_bn512h8_L0-29_fresh_25step_currentcache_414835_20260610_042850_10k/ckpt_best_val.pt --triplets_root data/droid_cache_windows_v0/val --overfit_one ep399_v0_s00004 --eval_noise_mode random --eval_seed_start 1000 --num_eval_noises 2 --include_null>"`
+- job_id: `9527756`
+- run_dir:
+  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_currentcache_414835_20260610_042850_10k`
+- logs:
+  `slurm_outputs/action-droid/out_act-droid-eval-s5000_9527756.log`,
+  `slurm_outputs/action-droid/err_act-droid-eval-s5000_9527756.log`
+- artifacts:
+  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_currentcache_414835_20260610_042850_10k/videos_bestval_step5000_ep399_v0_s00004_s1000_1001/`
+
+Result:
+- status: in_progress
+- metrics/artifacts:
+  - `9527755` and `9527756` submitted successfully.
+  - Initial `squeue` showed both eval jobs pending on `ailab` while
+    `9497852` continued running; no eval artifacts produced yet.
+  - `9497852` was running at the launch check with elapsed `13:24:11`.
+- key evidence: `squeue`/`sacct` snapshot after submission.
+
+Analysis:
+- Eval exports are queued behind the active training allocation as expected for
+  the proven `ailab` execution surface. This avoids interfering with current
+  training and still records the requested eval jobs.
+- DROID export uses validation sample `ep399_v0_s00004`, which is present in
+  the val window manifest and has a nontrivial action score.
+
+Next:
+- Monitor `9527755` and `9527756`; when they complete, fetch MP4s/metrics into
+  `_cluster/`, inspect metrics and videos, and use `viz_open` if available or
+  representative-frame inspection otherwise.
+- Continue periodic DROID training eval launches at future validation
+  checkpoints without asking for additional permission.
+
 ## 2026-06-08 - Initial Della Development Loop
 
 Goal:
