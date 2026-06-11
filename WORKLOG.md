@@ -3230,3 +3230,66 @@ Next:
   launch logs early. If it fails, cancel `9565757`, patch, and resubmit.
 - Continue monitoring `9541718`; trigger step-3000 eval when checkpoint is
   written.
+
+## 2026-06-11 16:36 PDT - Full-cache batch-5 step-3000 eval
+
+Goal:
+- Validate the third full-cache batch-size-5 checkpoint and continue the
+  periodic eval cadence.
+
+Hypothesis:
+- If the larger full-cache run continues learning, training validation and
+  fixed held-out random-noise eval MSE should improve versus step `2000`.
+
+Change:
+- No source change. Copied `ckpt_latest.pt` to `ckpt_step3000.pt` before eval.
+
+Version Control:
+- branch: `codex/droid-ddp-8gpu`
+- implementation_commit: `n/a` for eval; training source still canonical
+  single-GPU run code from `f370228`.
+- changed_files:
+  - `WORKLOG.md`
+  - `HANDOFF.md`
+
+Command / Job:
+- eval job: `9566483`
+- checkpoint:
+  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/ckpt_step3000.pt`
+- remote videos:
+  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step3000_ep399_v0_s00004_s1000_1001/`
+- local videos:
+  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step3000_ep399_v0_s00004_s1000_1001/`
+- viz-open URL:
+  `http://localhost:8765/view?path=Wan2.2/_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step3000_ep399_v0_s00004_s1000_1001`
+
+Result:
+- status: passed
+- `sacct -j 9566483` reports `COMPLETED 0:0`, elapsed `00:02:23`.
+- Training validation improved:
+  - step 1000: `0.2770900116302073`
+  - step 2000: `0.24543552426621318`
+  - step 3000: `0.23995679058134556`
+- Eval videos validate at 320x192, 33 frames, 16 FPS.
+- step-3000 eval metrics:
+  - seed1000 latent MSE `0.2574395537376404` vs null
+    `1.9798624515533447`.
+  - seed1001 latent MSE `0.26347997784614563` vs null
+    `4.661829471588135`.
+- contact sheet:
+  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step3000_ep399_v0_s00004_s1000_1001/droid_full_bs5_step3000_eval_contact_sheet.jpg`
+
+Analysis:
+- Numeric eval improved versus step 2000 on both seeds
+  (`0.2719 -> 0.2574`, `0.2751 -> 0.2635`).
+- Qualitatively, the output remains clearly better than null and preserves the
+  scene layout, but the robot/gripper region still turns into a gray/hazy smear
+  after motion starts. Larger-batch full-cache training is helping the metric
+  but has not solved the motion-region blur.
+- `viz_open` is not installed on the local PATH; the local viewer URL above is
+  reachable and was used for visualization.
+
+Next:
+- Continue monitoring `9541718`; next eval target is step `4000`.
+- Continue monitoring DDP 8-GPU smoke `9565756` and dependent full run
+  `9565757`.

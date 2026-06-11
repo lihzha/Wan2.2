@@ -130,6 +130,18 @@ sample set did not reveal an obvious easy low-rank structure. The practical
   `1.9798624515533447`; seed1001 latent MSE `0.2750750482082367` vs null
   `4.661829471588135`. Numerically improved from step 1000; visually the
   robot/gripper haze remains.
+- Full-cache batch-5 step-3000 validation improved again to
+  `0.23995679058134556`. Step-3000 eval job `9566483` completed cleanly using
+  `ckpt_step3000.pt`.
+  Local artifacts:
+  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step3000_ep399_v0_s00004_s1000_1001/`
+  Viz URL:
+  `http://localhost:8765/view?path=Wan2.2/_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step3000_ep399_v0_s00004_s1000_1001`
+  Metrics: seed1000 latent MSE `0.2574395537376404` vs null
+  `1.9798624515533447`; seed1001 latent MSE `0.26347997784614563` vs null
+  `4.661829471588135`. Numerically improved from step 2000; qualitatively the
+  scene layout remains much better than null, but the robot/gripper haze still
+  remains after motion starts.
 
 The current research direction is scaling side-adapter training with fresh
 noise.
