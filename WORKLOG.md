@@ -3034,7 +3034,7 @@ Version Control:
 - agent_id: orchestrator plus worker `019eb8ba-cc6f-7fc0-96df-29ceb166dfd2`
 - branch: `codex/droid-ddp-8gpu`
 - base_commit: `f37022874c588817d4ed77d463e3d27745053df4`
-- implementation_commit: `a0c1ce882ee3cbf4eb6055cbfa3ffefffbfe388e`
+- implementation_commit: `dd6f1c829a968f00c47947d835a9e6ee1f36d127`
 - changed_files:
   - `scripts/train_action_conditioned_wan_droid.py`
   - `run_action_conditioned_droid_dist.sh`

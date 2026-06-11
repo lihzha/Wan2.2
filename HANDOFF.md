@@ -16,7 +16,7 @@ in `WORKLOG.md`.
 - Latest canonical commit before the distributed-training patch:
   `f37022874c588817d4ed77d463e3d27745053df4`
 - Distributed-training implementation commit:
-  `a0c1ce882ee3cbf4eb6055cbfa3ffefffbfe388e`
+  `dd6f1c829a968f00c47947d835a9e6ee1f36d127`
 - The canonical Della checkout is intentionally left at the old commit while
   active single-GPU job `9541718` runs. Deploy DDP from an isolated Della
   worktree, not by mutating `/scratch/gpfs/AM43/lz3952/Wan2.2`.
