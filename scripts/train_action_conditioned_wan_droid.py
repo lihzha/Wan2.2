@@ -152,10 +152,15 @@ class LazyTripletLatentDataset(Dataset):
 
 def make_noise_for_batch(args, batch, device):
     shape = batch["z_video"].shape[1:]
+    batch_size = batch["z_video"].shape[0]
     if args.noise_mode == "fresh":
-        return torch.randn(*shape, device=device, dtype=torch.float32)
-    name = batch["name"][0]
-    return make_fixed_noise(shape, device, stable_seed(args.seed, name))
+        return torch.randn(
+            batch_size, *shape, device=device, dtype=torch.float32)
+    noises = [
+        make_fixed_noise(shape, device, stable_seed(args.seed, name))
+        for name in batch["name"]
+    ]
+    return torch.stack(noises, dim=0)
 
 
 @torch.no_grad()
@@ -195,8 +200,6 @@ def run_validation(
 
 def main():
     args = parse_args()
-    if args.batch_size != 1:
-        raise ValueError("closed-loop rollout training currently requires batch_size=1")
 
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
