@@ -415,6 +415,110 @@ Next:
 - Continue periodic DROID training eval launches at future validation
   checkpoints without asking for additional permission.
 
+## 2026-06-10 18:00 PDT - Eval Videos Fetched And Inspected
+
+Goal:
+- Validate the overfit and DROID step-5000 eval videos, not just the eval
+  Slurm exit codes.
+
+Hypothesis:
+- The overfit eval should be visually close to ground truth and much better
+  than null-only generation. The DROID eval may be weaker but should still show
+  a meaningful qualitative gap versus null if the step-5000 validation signal
+  is real.
+
+Change:
+- Fetched MP4s, `metrics.json`, and eval Slurm logs for jobs `9527755` and
+  `9527756` into ignored local `_cluster/` directories.
+- Generated local contact-sheet JPEGs from first/middle/last video frames.
+- `viz_open` was not available as a local shell command and no exposed tool
+  matched it, so visual inspection used local contact sheets via the available
+  image viewer.
+
+Version Control:
+- branch: `main`
+- base_commit: `e8bc3f1beb57c1c48059f7e4afb8876eb2528b67`
+- implementation_commit: pending worklog-only update
+- push/pull: no source deployment; artifact fetch only
+- changed_files: `WORKLOG.md`; ignored fetched artifacts under `_cluster/`
+- remote_commit/status: not re-pulled while active jobs are running.
+
+Command / Job:
+- command: monitored `sacct`/logs for `9527755`, then `rsync` fetched
+  `*.mp4`, `metrics.json`, and Slurm logs; generated contact sheet with
+  `ffmpeg` frame extraction and PIL composition.
+- job_id: `9527755`
+- run_dir:
+  `runs/action_overfit_ep0_v0_side_bn512h8_L0-29_fresh_25step_10k_lr5e-5`
+- logs:
+  `_cluster/slurm_outputs/action-overfit/out_act-overfit-eval-10k_9527755.log`,
+  `_cluster/slurm_outputs/action-overfit/err_act-overfit-eval-10k_9527755.log`
+- artifacts:
+  `_cluster/action_overfit_ep0_v0_side_bn512h8_L0-29_fresh_25step_10k_lr5e-5/videos_best_random_eval_s1000_1003/`
+  including `ground_truth.mp4`, `sample_seed1000..1003.mp4`,
+  `null_only_seed1000..1003.mp4`, `metrics.json`, and
+  `overfit_eval_contact_sheet.jpg`.
+
+Result:
+- status: passed
+- metrics/artifacts:
+  - Job `9527755` completed `0:0` in `00:02:19`.
+  - Overfit eval latent MSEs:
+    - seed1000 `0.0416005` vs null `2.53899`
+    - seed1001 `0.0405720` vs null `4.93637`
+    - seed1002 `0.0413762` vs null `2.49327`
+    - seed1003 `0.0404059` vs null `3.78863`
+  - All MP4s are `320x192`, `33` frames, `16 fps`, duration `2.0625s`.
+- key evidence: local `metrics.json`, MP4s, and contact sheet.
+
+Analysis:
+- The overfit videos are qualitatively strong: the action-conditioned samples
+  remain close to the sink/bottle scene across random seeds, while null-only
+  generations quickly collapse into severe color/geometric artifacts.
+- This supports that the side adapter overfit checkpoint learned meaningful
+  control for the one-sample case under fresh random noise.
+
+Command / Job:
+- command: monitored `sacct`/logs for `9527756`, then `rsync` fetched
+  `*.mp4`, `metrics.json`, and Slurm logs; generated contact sheet with
+  `ffmpeg` frame extraction and PIL composition.
+- job_id: `9527756`
+- run_dir:
+  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_currentcache_414835_20260610_042850_10k`
+- logs:
+  `_cluster/slurm_outputs/action-droid/out_act-droid-eval-s5000_9527756.log`,
+  `_cluster/slurm_outputs/action-droid/err_act-droid-eval-s5000_9527756.log`
+- artifacts:
+  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_currentcache_414835_20260610_042850_10k/videos_bestval_step5000_ep399_v0_s00004_s1000_1001/`
+  including `ground_truth.mp4`, `sample_seed1000..1001.mp4`,
+  `null_only_seed1000..1001.mp4`, `metrics.json`, and
+  `droid_step5000_eval_contact_sheet.jpg`.
+
+Result:
+- status: passed
+- metrics/artifacts:
+  - Job `9527756` completed `0:0` in `00:02:01`.
+  - Held-out sample: `ep399_v0_s00004`.
+  - DROID eval latent MSEs:
+    - seed1000 `0.251466` vs null `1.97986`
+    - seed1001 `0.252762` vs null `4.66183`
+  - All MP4s are `320x192`, `33` frames, `16 fps`, duration `2.0625s`.
+- key evidence: local `metrics.json`, MP4s, and contact sheet.
+
+Analysis:
+- The DROID step-5000 eval is meaningfully better than null, but still
+  qualitatively imperfect. It preserves the table/object layout much better
+  than null-only generation, but middle/late frames become cloudy and do not
+  cleanly reproduce the robot arm motion.
+- This is consistent with the current validation loss: the dataset run is
+  learning a real signal, but it has not reached overfit-level control quality.
+
+Next:
+- Continue monitoring DROID training through step `6000` validation.
+- Launch another DROID eval at the next validation checkpoint without asking
+  again, then compare videos and latent MSE against the step-5000 eval.
+- Continue cache monitoring; full train cache is still incomplete.
+
 ## 2026-06-08 - Initial Della Development Loop
 
 Goal:
