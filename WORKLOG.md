@@ -2786,3 +2786,70 @@ Next:
   rows, then continue through validation/eval checkpoints.
 - Continue monitoring current-cache job `9497852` to step `10000` and inspect
   the final periodic eval videos.
+
+## 2026-06-11 05:35 PDT - Current-cache DROID final eval and batch-5 walltime risk
+
+Goal:
+- Finish and inspect the step-10000 eval for current-cache DROID training, and
+  keep the full-cache batch-size-5 run under active monitoring.
+
+Hypothesis:
+- The current-cache run should show at least stable final validation/eval
+  behavior versus step 9000, while the full-cache batch-5 run should continue
+  past startup without OOM.
+
+Change:
+- No source change. Manually submitted the missing step-10000 eval after the
+  periodic watcher was no longer alive.
+
+Version Control:
+- implementation_commit: `1809c29`
+- changed_files:
+  - `WORKLOG.md`
+  - `HANDOFF.md`
+
+Command / Job:
+- completed current-cache train job: `9497852`
+- manual step-10000 eval job: `9542335`
+- active full-cache batch-5 train job: `9541718`
+- eval command:
+  `sbatch --parsable --job-name=act-droid-eval-s10000 ... scripts/export_action_conditioned_wan_video.py --ckpt_path runs/action_droid_side_bn512h8_L0-29_fresh_25step_currentcache_414835_20260610_042850_10k/ckpt_latest.pt --triplets_root data/droid_cache_windows_v0/val --overfit_one ep399_v0_s00004 --output_dir runs/action_droid_side_bn512h8_L0-29_fresh_25step_currentcache_414835_20260610_042850_10k/videos_latest_step10000_ep399_v0_s00004_s1000_1001 --eval_noise_mode random --eval_seed_start 1000 --num_eval_noises 2 --include_null`
+- local eval artifacts:
+  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_currentcache_414835_20260610_042850_10k/videos_latest_step10000_ep399_v0_s00004_s1000_1001/`
+- viz-open:
+  `http://localhost:8765/view?path=Wan2.2/_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_currentcache_414835_20260610_042850_10k/videos_latest_step10000_ep399_v0_s00004_s1000_1001`
+
+Result:
+- current-cache train job `9497852`: `COMPLETED 0:0`.
+- final validation improved slightly to `0.19281196547672153` at step 10000
+  from `0.19321248633787036` at step 9000.
+- step-10000 eval job `9542335`: `COMPLETED 0:0`.
+- eval videos validated at 320x192, 33 frames, 16 FPS.
+- step-10000 eval metrics:
+  - seed1000 latent MSE `0.22305864095687866` vs null
+    `1.9798624515533447`.
+  - seed1001 latent MSE `0.2230650782585144` vs null
+    `4.661829471588135`.
+- visual inspection: samples preserve the table/object layout and are far
+  better than null, but the robot/gripper region still becomes a gray cloudy
+  smear by mid/end frames. Step 10000 does not visually fix the step-9000 blur.
+- full-cache batch-5 job `9541718` is running on `della-i21g3`; early train
+  rows through step `120` are logged with no OOM or traceback.
+
+Analysis:
+- Current-cache training made a small validation gain from 9000 to 10000, but
+  held-out random-noise eval did not improve and qualitatively still has the
+  same moving-robot blur. This supports the earlier diagnosis that global
+  latent loss is learning static scene structure much better than sharp moving
+  robot geometry.
+- Batch size `5` is operationally viable on H200, but at the observed
+  full-cache speed of about `13.6s/step`, a 10k run likely needs roughly
+  38 hours. The submitted job has a 36-hour time limit, and `scontrol update`
+  to 48 hours was denied.
+
+Next:
+- Await user confirmation before adding DROID trainer resume support
+  (`RESUME_CKPT`, load model/step, optional optimizer restore, and save
+  optimizer for future checkpoints).
+- Continue monitoring `9541718`; first major checkpoint/validation is expected
+  at step `1000`.

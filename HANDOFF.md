@@ -39,7 +39,42 @@ The current best direction is the side adapter:
 
 Key conclusion so far: learning/predicting `z_init` directly from a large DDIM
 sample set did not reveal an obvious easy low-rank structure. The practical
-direction is scaling side-adapter training with fresh noise.
+## Current Status - 2026-06-11 05:35 PDT
+
+- Max-fit DROID batch size on the current single-H200 setup is `5`.
+  A real optimizer-step profiler showed batch sizes `6`, `7`, and `8` OOM,
+  while `5` passed with about 6.9 GiB free after the step.
+- Full DROID train cache is complete:
+  train `1,440,554/1,440,554`, val `14,636/14,636`.
+  Final cache array `9540854` completed cleanly.
+- Current-cache DROID job `9497852` completed cleanly at step `10000`.
+  Final validation loss is `0.19281196547672153`.
+- Step-10000 eval was submitted manually as job `9542335` because the periodic
+  watcher was no longer alive. It completed cleanly.
+  Local artifacts:
+  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_currentcache_414835_20260610_042850_10k/videos_latest_step10000_ep399_v0_s00004_s1000_1001/`
+  Viz URL:
+  `http://localhost:8765/view?path=Wan2.2/_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_currentcache_414835_20260610_042850_10k/videos_latest_step10000_ep399_v0_s00004_s1000_1001`
+- Step-10000 eval metrics:
+  seed1000 latent MSE `0.22305864095687866` vs null `1.9798624515533447`;
+  seed1001 latent MSE `0.2230650782585144` vs null `4.661829471588135`.
+  Qualitatively, the table/object layout is preserved, but the robot/gripper
+  still smears into a gray cloudy blur by mid/end frames.
+- Full-cache batch-5 smoke job `9541649` completed cleanly.
+- Premature full job `9541650` was canceled after launch logging only, due a
+  waiter job-id parsing bug.
+- Waiter guard fix is committed in `8c6cc5d`; latest main/worklog commit is
+  `1809c29`, and the Della checkout is fast-forwarded there.
+- Active full-cache batch-5 job:
+  `9541718` `act-droid-win-10k`, node `della-i21g3`, run dir
+  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5`.
+  It is healthy through at least step `120`, but its 36-hour wall time is likely
+  too short for all 10k steps at the observed `~13.6s/step`. `scontrol update`
+  to 48 hours was denied. Do not patch resume support until the user confirms
+  the plan.
+
+The current research direction is scaling side-adapter training with fresh
+noise.
 
 ## Relevant Implementation
 
@@ -198,4 +233,3 @@ ssh della-gpu 'cd /scratch/gpfs/AM43/lz3952/Wan2.2 && \
 4. Continue cache submitter monitoring. When the full planned cache completes,
    the existing waiter should submit the full-cache smoke and 10k runs.
 5. Keep updating `WORKLOG.md` and commit/push any code or documentation changes.
-
