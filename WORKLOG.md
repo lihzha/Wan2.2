@@ -2583,3 +2583,58 @@ Next:
   cache submitter jobs untouched.
 - Continue monitoring current DROID training through step10000 and fetch/inspect
   the final eval videos.
+
+## 2026-06-11 03:25 PDT - Resume cache submitter after stale sacct rows
+
+Goal:
+- Keep the full DROID train cache moving after the previous chunk submitter
+  exited on stale `sacct RUNNING` rows.
+
+Hypothesis:
+- Array `9539503` shards `982-984` actually completed cleanly; `sacct` was
+  stale while `scontrol show job` and shard logs had the authoritative terminal
+  state.
+
+Change:
+- Hardened `scripts/submit_droid_train_cache_chunks.sh` and
+  `scripts/wait_and_submit_action_droid_training.sh` to accept
+  `sacct RUNNING 0:0` rows only when `scontrol show job <row>` reports
+  `JobState=COMPLETED` and `ExitCode=0:0`.
+- Replaced the old full-cache waiter PID `1883834` with PID `298171` using
+  `DROID_BATCH_SIZE=5` and
+  `LOG_PATH=runs/droid_window_plans/action_droid_training_submitter_resume_bs5.log`.
+
+Version Control:
+- base_commit: `a58bab8`
+- implementation_commit: pending
+- changed_files:
+  - `scripts/submit_droid_train_cache_chunks.sh`
+  - `scripts/wait_and_submit_action_droid_training.sh`
+  - `WORKLOG.md`
+
+Command / Job:
+- validation:
+  - `bash -n scripts/submit_droid_train_cache_chunks.sh scripts/wait_and_submit_action_droid_training.sh`
+- stale chunk checked:
+  - `scontrol show job 9539503_982`
+  - `scontrol show job 9539503_983`
+  - `scontrol show job 9539503_984`
+- replacement waiter:
+  - `nohup env POLL_SECONDS=900 DROID_BATCH_SIZE=5 LOG_PATH=runs/droid_window_plans/action_droid_training_submitter_resume_bs5.log bash scripts/wait_and_submit_action_droid_training.sh ...`
+
+Result:
+- `9539503_982`, `_983`, and `_984` are `COMPLETED ExitCode=0:0` by
+  `scontrol`; their logs end with `done ok=1407 skip=0 fail=0`.
+- Replacement waiter log starts with
+  `waiting for cache train=1440554 val=14636 batch_size=5`.
+- Cache is not complete yet; the previous waiter count was
+  `1,381,851/1,440,554` at 06:07 EDT.
+
+Analysis:
+- The cache submitter failed from scheduler-accounting staleness, not from a
+  data/cache failure. Resuming at shard `985` avoids repeating completed shard
+  work.
+
+Next:
+- Commit/push the stale-accounting patch, update Della, and relaunch the cache
+  submitter from `START_SHARD=985` with the same gputest settings.

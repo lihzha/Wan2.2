@@ -38,12 +38,22 @@ wait_for_job() {
     sleep "${POLL_SECONDS}"
   done
 
-  local bad
-  bad=$(sacct -P -n -j "${job_id}" --format=JobID,State,ExitCode 2>/dev/null \
-    | awk -F'|' '
-      /\.batch$/ || /\.extern$/ {next}
-      $2 != "COMPLETED" || $3 != "0:0" {print}
-    ' || true)
+  local bad=""
+  while IFS='|' read -r row_job row_state row_exit; do
+    [[ -n "${row_job}" ]] || continue
+    [[ "${row_job}" =~ \.(batch|extern)$ ]] && continue
+    if [[ "${row_state}" == "COMPLETED" && "${row_exit}" == "0:0" ]]; then
+      continue
+    fi
+    if [[ "${row_state}" == "RUNNING" && "${row_exit}" == "0:0" ]]; then
+      ctl=$(scontrol show job "${row_job}" 2>/dev/null || true)
+      if [[ "${ctl}" == *"JobState=COMPLETED"* && "${ctl}" == *"ExitCode=0:0"* ]]; then
+        log "accepting stale sacct RUNNING row for ${row_job}; scontrol is COMPLETED 0:0"
+        continue
+      fi
+    fi
+    bad+="${row_job}|${row_state}|${row_exit}"$'\n'
+  done < <(sacct -P -n -j "${job_id}" --format=JobID,State,ExitCode 2>/dev/null || true)
   if [[ -n "${bad}" ]]; then
     log "job ${job_id} had non-clean tasks:"
     echo "${bad}" | tee -a "${LOG_PATH}"
