@@ -689,6 +689,72 @@ Next:
 - Fetch, validate, visualize, and record the step-8000 eval once it completes.
 - Continue cache/full-cache waiter monitoring.
 
+## 2026-06-10 23:22 PDT - Cache Submitter Resume From Shard 865
+
+Goal:
+- Recover the DROID train-cache materialization after the previous chunk
+  submitter stopped at shard range `841-864`.
+
+Hypothesis:
+- The chunk `841-864` actually completed successfully, and the failure was a
+  Slurm accounting race where `sacct` still reported two array tasks as
+  `RUNNING` after `squeue` emptied.
+
+Change:
+- Inspected `squeue`, `sacct`, `scontrol show job`, and per-task logs for
+  array `9534921`.
+- Confirmed shards `841-864` all wrote `done ok=... fail=0`; `scontrol` showed
+  tasks `9534921_861` and `9534921_864` as `COMPLETED` with `ExitCode=0:0`
+  even though `sacct` still had stale `RUNNING` rows.
+- Launched a run-local robust cache submitter from shard `865` that accepts
+  stale `sacct RUNNING` rows only when `scontrol` reports the task completed
+  cleanly. No tracked source code changes.
+
+Version Control:
+- branch: `main`
+- base_commit: `f4bb71c224b39441943ff5d28d4d0a13206bdddd`
+- implementation_commit: pending worklog-only update
+- push/pull: no source deployment; recovery submitter is a remote run-local
+  orchestration process
+- changed_files: `WORKLOG.md`
+- remote_commit/status: tracked remote checkout not changed.
+
+Command / Job:
+- command: remote `nohup bash` robust submitter with `START_SHARD=865`,
+  `TOTAL_SHARDS=1024`, `CHUNK_SIZE=24`, `CONCURRENCY=3`, `--qos=gpu-test`,
+  `TIME_LIMIT=00:10:00`, and `run_precompute_droid_window_plan_array_anygpu.sh`
+- submitter_pid: `3404408`
+- submitter_log:
+  `runs/droid_window_plans/train_cache_chunk_submitter_gputest_1024_resume_from_865_robust_20260611_022200.log`
+- first resumed array job: `9536297`
+- first resumed shard range: `865-888`
+
+Result:
+- status: in_progress
+- metrics/artifacts:
+  - Original array `9534921` for shards `841-864` completed according to
+    `scontrol` and per-shard output logs.
+  - Previous waiter count before recovery was `1216132/1440554` train windows
+    and `14636/14636` val windows.
+  - New robust submitter launched array `9536297` for shards `865-888`, pending
+    initially on `gpu-test`.
+- key evidence: remote `scontrol show job 9534921_861`,
+  `scontrol show job 9534921_864`, shard output logs, and robust submitter log.
+
+Analysis:
+- The original submitter's strict `sacct` check is vulnerable to stale
+  accounting immediately after array completion. Since all suspicious shard logs
+  ended with `fail=0`, restarting from `865` avoids duplicate work and does not
+  skip any planned shard.
+- The robust submitter is intentionally run-local rather than a tracked source
+  patch so active training/eval code is not mutated underneath running jobs.
+
+Next:
+- Monitor robust cache submitter `3404408` and array `9536297`; ensure it
+  continues through remaining shard ranges `865-1023`.
+- Keep the full-cache waiter running; it should only submit full-cache training
+  after the train count reaches `1440554/1440554`.
+
 ## 2026-06-08 - Initial Della Development Loop
 
 Goal:
