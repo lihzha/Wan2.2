@@ -3006,3 +3006,64 @@ Analysis:
 
 Next:
 - Continue monitoring `9541718`; next validation/eval target is step `3000`.
+
+## 2026-06-11 15:15 PDT - DROID DDP trainer implementation
+
+Goal:
+- Add multi-GPU training support for the DROID action-conditioned Wan trainer
+  and prepare an 8-GPU Della launch path without disturbing the active
+  single-GPU batch-5 run.
+
+Hypothesis:
+- The current trainer can use DDP with minimal risk because the Wan backbone is
+  frozen and each rank can run the same local closed-loop rollout while DDP
+  synchronizes only the trainable adapter gradients.
+
+Change:
+- Added torchrun/NCCL initialization from `WORLD_SIZE`, `RANK`, and
+  `LOCAL_RANK`.
+- Set the local CUDA device before constructing Wan, and added a rank-aware
+  Wan pipeline builder so ranks do not all load onto GPU 0.
+- Added `DistributedSampler` for training, DDP wrapping for
+  `ActionConditionedWanModel`, rank-0-only config/log/validation/checkpoint
+  writes, and synchronization barriers around validation/checkpoint events.
+- Added `run_action_conditioned_droid_dist.sh`, a Della launcher for
+  one-node multi-GPU DROID training using `torchrun`.
+
+Version Control:
+- agent_id: orchestrator plus worker `019eb8ba-cc6f-7fc0-96df-29ceb166dfd2`
+- branch: `codex/droid-ddp-8gpu`
+- base_commit: `f37022874c588817d4ed77d463e3d27745053df4`
+- implementation_commit: `a0c1ce882ee3cbf4eb6055cbfa3ffefffbfe388e`
+- changed_files:
+  - `scripts/train_action_conditioned_wan_droid.py`
+  - `run_action_conditioned_droid_dist.sh`
+  - `WORKLOG.md`
+  - `HANDOFF.md`
+
+Command / Job:
+- local static checks:
+  `git diff --check -- scripts/train_action_conditioned_wan_droid.py run_action_conditioned_droid_dist.sh`
+  `bash -n run_action_conditioned_droid_dist.sh`
+  `bash -n run_action_conditioned_droid.sh`
+  `/usr/bin/python3 -m py_compile scripts/train_action_conditioned_wan_droid.py`
+- Slurm route check:
+  `sbatch --test-only --account=am43 --partition=ailab --qos=ailab --nodes=1 --gres=gpu:8 --cpus-per-task=64 --mem=720G --time=00:20:00 --job-name=dist-smoke-test --wrap=hostname`
+
+Result:
+- status: implementation/static-validation passed; cluster smoke pending.
+- Static checks passed locally.
+- Della accepted the 8-GPU allocation shape, with an estimated start around
+  `2026-06-12T23:38:58` at the time of the test-only probe.
+- Active single-GPU run `9541718` was left untouched and continued running.
+
+Analysis:
+- The patch preserves single-process behavior when `WORLD_SIZE=1`.
+- The main remaining risk is runtime DDP behavior with the large frozen Wan
+  module wrapped inside DDP; a short multi-GPU smoke is required before the
+  full 8-GPU training run.
+
+Next:
+- Commit and push the DDP branch, deploy the exact commit to an isolated Della
+  worktree, run a short distributed smoke, inspect logs/checkpoints, then submit
+  the full 8-GPU training run if the smoke is clean.

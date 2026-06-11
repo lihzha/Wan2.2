@@ -23,8 +23,11 @@ from pathlib import Path
 
 import numpy as np
 import torch
-from torch.utils.data import Dataset
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader
+from torch.utils.data import Dataset
+from torch.utils.data.distributed import DistributedSampler
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO_ROOT)
@@ -38,7 +41,6 @@ from train_adaptor import (  # noqa: E402
     TripletLatentDataset,
     build_latent_geometry,
     build_sigma_schedule,
-    build_wan_pipeline,
     collate,
     model_grad_checkpointing,
 )
@@ -50,6 +52,86 @@ from train_action_conditioned_wan import (  # noqa: E402
     rollout_loss,
     save_ckpt,
 )
+from wan.configs.wan_ti2v_5B import ti2v_5B  # noqa: E402
+from wan.textimage2video import WanTI2V  # noqa: E402
+
+
+def _env_int(name: str, default: int) -> int:
+    value = os.environ.get(name)
+    return default if value is None or value == "" else int(value)
+
+
+def setup_distributed_from_env() -> dict:
+    world_size = _env_int("WORLD_SIZE", 1)
+    rank = _env_int("RANK", 0)
+    local_rank = _env_int("LOCAL_RANK", 0)
+    distributed = world_size > 1
+
+    if torch.cuda.is_available():
+        device_count = torch.cuda.device_count()
+        if local_rank >= device_count:
+            raise RuntimeError(
+                f"LOCAL_RANK={local_rank} but only {device_count} CUDA devices "
+                "are visible")
+        torch.cuda.set_device(local_rank)
+    elif distributed:
+        raise RuntimeError("DDP training requires CUDA/NCCL, but CUDA is unavailable")
+
+    if distributed and not dist.is_initialized():
+        dist.init_process_group(backend="nccl", init_method="env://")
+        rank = dist.get_rank()
+        world_size = dist.get_world_size()
+
+    return {
+        "distributed": distributed,
+        "rank": rank,
+        "world_size": world_size,
+        "local_rank": local_rank,
+        "is_main": rank == 0,
+    }
+
+
+def cleanup_distributed(distributed: bool) -> None:
+    if distributed and dist.is_initialized():
+        dist.destroy_process_group()
+
+
+def barrier(distributed: bool) -> None:
+    if distributed and dist.is_initialized():
+        dist.barrier()
+
+
+def rank0_print(dist_info: dict, *args, **kwargs) -> None:
+    if dist_info["is_main"]:
+        print(*args, **kwargs)
+
+
+def build_ranked_wan_pipeline(
+    ckpt_dir: str,
+    *,
+    device_id: int,
+    rank: int,
+    verbose: bool,
+) -> WanTI2V:
+    """Rank-aware copy of train_adaptor.build_wan_pipeline."""
+    if verbose:
+        print(f"[train] loading Wan TI2V-5B from {ckpt_dir} on cuda:{device_id}...")
+    pipe = WanTI2V(
+        config=ti2v_5B,
+        checkpoint_dir=ckpt_dir,
+        device_id=device_id,
+        rank=rank,
+        t5_cpu=False,
+        init_on_cpu=False,
+        convert_model_dtype=True,
+    )
+    # Ensure everything is frozen / eval.
+    pipe.model.eval().requires_grad_(False)
+    pipe.vae.model.eval().requires_grad_(False)
+    pipe.text_encoder.model.eval().requires_grad_(False)
+    if verbose:
+        print(f"[train] loaded. device={pipe.device} param_dtype={pipe.param_dtype}")
+    return pipe
 
 
 def list_triplet_names(root: str) -> list[str]:
@@ -198,16 +280,31 @@ def run_validation(
     return sum(losses) / len(losses)
 
 
-def main():
-    args = parse_args()
+def run_training(args, dist_info: dict):
+    rank = dist_info["rank"]
+    world_size = dist_info["world_size"]
+    local_rank = dist_info["local_rank"]
+    distributed = dist_info["distributed"]
+    is_main = dist_info["is_main"]
+    global_batch_size = args.batch_size * world_size
 
     out_dir = Path(args.output_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    with open(out_dir / "config.json", "w") as f:
-        json.dump(vars(args), f, indent=2)
+    if is_main:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        resolved_config = {
+            **vars(args),
+            "distributed": distributed,
+            "rank": rank,
+            "world_size": world_size,
+            "local_rank": local_rank,
+            "global_batch_size": global_batch_size,
+        }
+        with open(out_dir / "config.json", "w") as f:
+            json.dump(resolved_config, f, indent=2)
+    barrier(distributed)
 
-    torch.manual_seed(args.seed)
-    torch.cuda.manual_seed_all(args.seed)
+    torch.manual_seed(args.seed + rank)
+    torch.cuda.manual_seed_all(args.seed + rank)
 
     if args.train_manifest_jsonl:
         train_names = names_from_manifest(args.train_manifest_jsonl)
@@ -234,15 +331,31 @@ def main():
             args.val_triplets_root, val_names)
         if val_names else None
     )
+    train_sampler = (
+        DistributedSampler(
+            train_ds,
+            num_replicas=world_size,
+            rank=rank,
+            shuffle=True,
+            seed=args.seed,
+            drop_last=True,
+        )
+        if distributed else None
+    )
     train_loader = DataLoader(
         train_ds,
         batch_size=args.batch_size,
-        shuffle=True,
+        shuffle=train_sampler is None,
+        sampler=train_sampler,
         num_workers=args.num_workers,
         pin_memory=True,
         collate_fn=collate,
         drop_last=True,
     )
+    if len(train_loader) == 0:
+        raise ValueError(
+            "training loader has no batches; reduce batch/world size or add "
+            "training samples")
     val_loader = (
         DataLoader(
             val_ds,
@@ -252,10 +365,15 @@ def main():
             pin_memory=True,
             collate_fn=collate,
         )
-        if val_ds is not None else None
+        if is_main and val_ds is not None else None
     )
 
-    pipe = build_wan_pipeline(args.ckpt_dir)
+    pipe = build_ranked_wan_pipeline(
+        args.ckpt_dir,
+        device_id=local_rank,
+        rank=rank,
+        verbose=is_main,
+    )
     pipe.text_encoder.model.to(pipe.device)
     with torch.no_grad():
         null_context = pipe.encode_prompt("").detach().float()
@@ -282,18 +400,37 @@ def main():
         side_adapter_heads=args.side_adapter_heads or None,
     )
     model = ActionConditionedWanModel(pipe.model, cfg).to(pipe.device)
+    train_model = (
+        DistributedDataParallel(
+            model,
+            device_ids=[local_rank],
+            output_device=local_rank,
+            broadcast_buffers=False,
+        )
+        if distributed else model
+    )
     trainable = list(model.adapter_parameters())
     optim = torch.optim.AdamW(
         trainable, lr=args.lr, weight_decay=args.weight_decay,
         betas=(0.9, 0.999))
 
-    print(f"[action-droid] train_samples={len(train_ds)} "
-          f"val_samples={0 if val_ds is None else len(val_ds)} mode={args.mode}")
-    print(f"[action-droid] steps={args.sampling_steps} "
-          f"train_steps={args.total_steps} noise_mode={args.noise_mode} "
-          f"guide_scale={args.train_guide_scale}")
-    print(f"[action-droid] seq_len={seq_len} z_shape={tuple(first['z_video'].shape)} "
-          f"trainable_params={sum(p.numel() for p in trainable)/1e6:.2f}M")
+    rank0_print(
+        dist_info,
+        f"[action-droid] train_samples={len(train_ds)} "
+        f"val_samples={0 if val_ds is None else len(val_ds)} mode={args.mode}")
+    rank0_print(
+        dist_info,
+        f"[action-droid] distributed={distributed} world_size={world_size} "
+        f"local_batch={args.batch_size} global_batch={global_batch_size}")
+    rank0_print(
+        dist_info,
+        f"[action-droid] steps={args.sampling_steps} "
+        f"train_steps={args.total_steps} noise_mode={args.noise_mode} "
+        f"guide_scale={args.train_guide_scale}")
+    rank0_print(
+        dist_info,
+        f"[action-droid] seq_len={seq_len} z_shape={tuple(first['z_video'].shape)} "
+        f"trainable_params={sum(p.numel() for p in trainable)/1e6:.2f}M")
 
     train_log = out_dir / "train_log.csv"
     val_log = out_dir / "val_log.csv"
@@ -301,26 +438,34 @@ def main():
         "step", "sample", "loss", "latent_mse", "z_pred_std",
         "z_target_std", "z_init_std", "lr", "grad_norm", "wall_s",
     ]
-    with open(train_log, "w", newline="") as f:
-        csv.DictWriter(f, fieldnames=train_fields).writeheader()
-    with open(val_log, "w", newline="") as f:
-        csv.DictWriter(f, fieldnames=["step", "val_loss", "n_val", "wall_s"]).writeheader()
+    if is_main:
+        with open(train_log, "w", newline="") as f:
+            csv.DictWriter(f, fieldnames=train_fields).writeheader()
+        with open(val_log, "w", newline="") as f:
+            csv.DictWriter(
+                f, fieldnames=["step", "val_loss", "n_val", "wall_s"]).writeheader()
 
     best_val = float("inf")
     latest_val = None
     t0 = time.time()
+    sampler_epoch = 0
+    if train_sampler is not None:
+        train_sampler.set_epoch(sampler_epoch)
     train_iter = iter(train_loader)
     ckpt_ctx = (
         model_grad_checkpointing(pipe) if args.gradient_checkpointing
         else contextlib.nullcontext()
     )
 
-    model.train()
+    train_model.train()
     with ckpt_ctx:
         for step in range(args.total_steps):
             try:
                 batch = next(train_iter)
             except StopIteration:
+                sampler_epoch += 1
+                if train_sampler is not None:
+                    train_sampler.set_epoch(sampler_epoch)
                 train_iter = iter(train_loader)
                 batch = next(train_iter)
 
@@ -333,7 +478,7 @@ def main():
             optim.zero_grad(set_to_none=True)
             loss, logs = rollout_loss(
                 pipe=pipe,
-                model=model,
+                model=train_model,
                 batch=batch,
                 sigmas=sigmas,
                 null_context=null_context,
@@ -349,7 +494,7 @@ def main():
             logs["lr"] = optim.param_groups[0]["lr"]
             logs["grad_norm"] = float(grad_norm.item())
             logs["wall_s"] = round(time.time() - t0, 3)
-            if step == 0 or (step + 1) % args.log_interval == 0:
+            if is_main and (step == 0 or (step + 1) % args.log_interval == 0):
                 print(
                     f"[action-droid] step={step + 1:06d} "
                     f"sample={batch['name'][0]} loss={logs['loss']:.6f} "
@@ -359,47 +504,73 @@ def main():
                     writer.writerow({"step": step + 1, "sample": batch["name"][0], **logs})
 
             should_val = (
-                val_loader is not None and args.val_interval > 0
+                val_ds is not None and args.val_interval > 0
                 and ((step + 1) % args.val_interval == 0 or step == args.total_steps - 1)
             )
             if should_val:
-                latest_val = run_validation(
-                    args, pipe, model, val_loader, sigmas, null_context, seq_len, mask2)
-                wall = round(time.time() - t0, 3)
-                print(
-                    f"[action-droid] step={step + 1:06d} "
-                    f"val_loss={latest_val:.6f} n_val={args.max_val_samples}")
-                with open(val_log, "a", newline="") as f:
-                    writer = csv.DictWriter(
-                        f, fieldnames=["step", "val_loss", "n_val", "wall_s"])
-                    writer.writerow({
-                        "step": step + 1,
-                        "val_loss": latest_val,
-                        "n_val": args.max_val_samples,
-                        "wall_s": wall,
-                    })
-                if latest_val < best_val:
-                    best_val = latest_val
-                    save_ckpt(
-                        out_dir / "ckpt_best_val.pt", model, optim, args,
-                        step, {**logs, "val_loss": latest_val})
+                barrier(distributed)
+                if is_main:
+                    latest_val = run_validation(
+                        args, pipe, model, val_loader, sigmas, null_context, seq_len, mask2)
+                    wall = round(time.time() - t0, 3)
+                    print(
+                        f"[action-droid] step={step + 1:06d} "
+                        f"val_loss={latest_val:.6f} n_val={args.max_val_samples}")
+                    with open(val_log, "a", newline="") as f:
+                        writer = csv.DictWriter(
+                            f, fieldnames=["step", "val_loss", "n_val", "wall_s"])
+                        writer.writerow({
+                            "step": step + 1,
+                            "val_loss": latest_val,
+                            "n_val": args.max_val_samples,
+                            "wall_s": wall,
+                        })
+                    if latest_val < best_val:
+                        best_val = latest_val
+                        save_ckpt(
+                            out_dir / "ckpt_best_val.pt", model, optim, args,
+                            step, {**logs, "val_loss": latest_val})
+                barrier(distributed)
 
-            if (
+            should_ckpt = (
                 (step + 1) % args.ckpt_interval == 0
                 or step == args.total_steps - 1
-            ):
-                save_ckpt(out_dir / "ckpt_latest.pt", model, optim, args, step, logs)
+            )
+            if should_ckpt:
+                barrier(distributed)
+                if is_main:
+                    save_ckpt(
+                        out_dir / "ckpt_latest.pt", model, optim, args, step, logs)
+                barrier(distributed)
 
-    summary = {
-        "train_samples": len(train_ds),
-        "val_samples": 0 if val_ds is None else len(val_ds),
-        "latest_train": logs,
-        "latest_val_loss": latest_val,
-        "best_val_loss": None if best_val == float("inf") else best_val,
-    }
-    with open(out_dir / "summary.json", "w") as f:
-        json.dump(summary, f, indent=2)
-    print(f"[action-droid] done latest={logs['loss']:.6f} best_val={summary['best_val_loss']}")
+    if is_main:
+        summary = {
+            "train_samples": len(train_ds),
+            "val_samples": 0 if val_ds is None else len(val_ds),
+            "latest_train": logs,
+            "latest_val_loss": latest_val,
+            "best_val_loss": None if best_val == float("inf") else best_val,
+            "distributed": distributed,
+            "world_size": world_size,
+            "local_rank": local_rank,
+            "rank": rank,
+            "global_batch_size": global_batch_size,
+        }
+        with open(out_dir / "summary.json", "w") as f:
+            json.dump(summary, f, indent=2)
+        print(
+            f"[action-droid] done latest={logs['loss']:.6f} "
+            f"best_val={summary['best_val_loss']}")
+    barrier(distributed)
+
+
+def main():
+    args = parse_args()
+    dist_info = setup_distributed_from_env()
+    try:
+        run_training(args, dist_info)
+    finally:
+        cleanup_distributed(dist_info["distributed"])
 
 
 if __name__ == "__main__":

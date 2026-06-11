@@ -1,6 +1,6 @@
 # Wan2.2 Della Handoff
 
-Last updated: 2026-06-10 13:41 PDT.
+Last updated: 2026-06-11 15:15 PDT.
 
 This is the short handoff for the next agent. The full chronological record is
 in `WORKLOG.md`.
@@ -9,13 +9,17 @@ in `WORKLOG.md`.
 
 - Local repo: `/Users/lzha/code/Wan2.2`
 - Della repo: `/scratch/gpfs/AM43/lz3952/Wan2.2`
-- Branch: `main`
+- Canonical branch: `main`
+- Active implementation branch: `codex/droid-ddp-8gpu`
 - Fork remote: `git@github.com:lihzha/Wan2.2.git`
 - Upstream remote: `https://github.com/Wan-Video/Wan2.2.git`
-- Latest local/fork commit before this handoff:
-  `79554b590d0579be0d2dbe94bd0e74dc1ea5f7ff`
-- Della was last live-verified at the same commit at
-  `2026-06-10 04:30:59 EDT` / `2026-06-10 01:30:59 PDT`.
+- Latest canonical commit before the distributed-training patch:
+  `f37022874c588817d4ed77d463e3d27745053df4`
+- Distributed-training implementation commit:
+  `a0c1ce882ee3cbf4eb6055cbfa3ffefffbfe388e`
+- The canonical Della checkout is intentionally left at the old commit while
+  active single-GPU job `9541718` runs. Deploy DDP from an isolated Della
+  worktree, not by mutating `/scratch/gpfs/AM43/lz3952/Wan2.2`.
 
 Use Git for tracked code/config/script/docs. Do not deploy tracked source with
 `rsync`. Use `rsync` only for logs, videos, checkpoints, datasets, and other
@@ -40,6 +44,20 @@ The current best direction is the side adapter:
 Key conclusion so far: learning/predicting `z_init` directly from a large DDIM
 sample set did not reveal an obvious easy low-rank structure. The practical
 ## Current Status - 2026-06-11 05:35 PDT
+
+- A DDP implementation is in progress on branch `codex/droid-ddp-8gpu`.
+  It adds torchrun/NCCL setup, rank-aware Wan device construction,
+  `DistributedSampler`, DDP wrapping, rank-0-only validation/logging/checkpoint
+  writes, and a new `run_action_conditioned_droid_dist.sh` launcher.
+  Static checks passed locally:
+  `git diff --check`,
+  `bash -n run_action_conditioned_droid_dist.sh`,
+  `bash -n run_action_conditioned_droid.sh`, and
+  `/usr/bin/python3 -m py_compile scripts/train_action_conditioned_wan_droid.py`.
+  Della accepted an 8-GPU `ailab` allocation shape via `sbatch --test-only`,
+  but estimated a late start (`2026-06-12T23:38:58` at probe time).
+  Next step is an isolated Della worktree plus short DDP smoke before full
+  8-GPU training.
 
 - Max-fit DROID batch size on the current single-H200 setup is `5`.
   A real optimizer-step profiler showed batch sizes `6`, `7`, and `8` OOM,
