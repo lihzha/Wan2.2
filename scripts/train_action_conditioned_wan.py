@@ -174,12 +174,13 @@ def rollout_loss(
             v_cond = torch.stack(v_cond, dim=0).float()
         if abs(guide_scale - 1.0) > 1e-6:
             with torch.no_grad():
-                v_uncond = pipe.model(
-                    [z_b.detach() for z_b in z],
-                    t=timestep,
-                    context=context,
-                    seq_len=seq_len,
-                )
+                with torch.amp.autocast("cuda", dtype=pipe.param_dtype):
+                    v_uncond = pipe.model(
+                        [z_b.detach() for z_b in z],
+                        t=timestep,
+                        context=context,
+                        seq_len=seq_len,
+                    )
                 v_uncond = torch.stack(v_uncond, dim=0).float()
             v = v_uncond + guide_scale * (v_cond - v_uncond)
         else:
