@@ -3149,7 +3149,7 @@ Change:
 Version Control:
 - branch: `codex/droid-ddp-8gpu`
 - base_commit: `062743f`
-- implementation_commit: `PENDING_BARRIER_FIX_COMMIT`
+- implementation_commit: `f978882964601df9be761a12a5baf6f0db24bc1f`
 - changed_files:
   - `scripts/train_action_conditioned_wan_droid.py`
   - `WORKLOG.md`
