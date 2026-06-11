@@ -2735,3 +2735,54 @@ Next:
 - Commit/push the waiter guard, update the Della checkout, inspect smoke logs
   to completion, and submit the full batch-5 run only after the smoke job has
   real `COMPLETED 0:0` accounting plus train/val logs.
+
+## 2026-06-11 05:00 PDT - Batch-5 smoke passed and full run submitted
+
+Goal:
+- Validate the full-cache batch-size-5 training path and launch the real 10k
+  full-cache run only after a clean smoke.
+
+Hypothesis:
+- The profiler's max-fit batch size `5` should also run in the real DROID
+  full-cache trainer when using the fixed batched rollout/autocast code.
+
+Change:
+- Deployed commit `8c6cc5d` to the canonical Della checkout.
+- Manually submitted the full batch-5 training job after smoke completion,
+  because the prior waiter process had already exited after the job-id parsing
+  bug.
+
+Version Control:
+- implementation_commit: `8c6cc5d`
+- push/pull: pushed to `origin/main` and fast-forwarded
+  `/scratch/gpfs/AM43/lz3952/Wan2.2` to `8c6cc5d`.
+- changed_files: `WORKLOG.md`
+
+Command / Job:
+- smoke job: `9541649`
+- premature full job canceled: `9541650`
+- full batch-5 job: `9541718`
+- smoke run dir:
+  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_smoke_bs5`
+- full run dir:
+  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5`
+
+Result:
+- smoke status: passed
+- `sacct -j 9541649` reports `COMPLETED 0:0`.
+- smoke launch confirmed `batch_size=5`, `total_steps=5`,
+  `max_train_samples=128`, `max_val_samples=4`.
+- smoke train losses: `2.9840`, `3.5863`, `4.6761`, `4.7428`, `4.2348`.
+- smoke validation: `val_loss=4.170713365077972`, `n_val=4`.
+- full batch-5 job `9541718` is submitted and initially pending.
+
+Analysis:
+- The smoke proves the real batched DROID trainer can execute batch size `5`
+  through training and validation. The high smoke losses are expected from a
+  five-step fresh full-cache smoke and are not a convergence signal.
+
+Next:
+- Monitor `9541718` until it starts, confirm launch config and early train
+  rows, then continue through validation/eval checkpoints.
+- Continue monitoring current-cache job `9497852` to step `10000` and inspect
+  the final periodic eval videos.
