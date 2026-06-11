@@ -2901,3 +2901,56 @@ Analysis:
 Next:
 - Continue monitoring `9541718`; next validation/checkpoint is step `2000`.
 - Await user confirmation before implementing resume support.
+
+## 2026-06-11 10:05 PDT - Full-cache batch-5 step-1000 eval
+
+Goal:
+- Run and inspect the first periodic eval for the full-cache batch-size-5
+  training run.
+
+Hypothesis:
+- At step 1000, the full-cache run should be better than null but likely worse
+  than the completed current-cache 10k run because it is still early in
+  training.
+
+Change:
+- No source change. Copied `ckpt_latest.pt` to `ckpt_step1000.pt` before eval
+  so the eval job could not accidentally load a later checkpoint.
+
+Version Control:
+- implementation_commit: `b67341c`
+- changed_files:
+  - `WORKLOG.md`
+  - `HANDOFF.md`
+
+Command / Job:
+- eval job: `9551286`
+- checkpoint:
+  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/ckpt_step1000.pt`
+- remote videos:
+  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step1000_ep399_v0_s00004_s1000_1001/`
+- local videos:
+  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step1000_ep399_v0_s00004_s1000_1001/`
+- viz-open:
+  `http://localhost:8765/view?path=Wan2.2/_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step1000_ep399_v0_s00004_s1000_1001`
+
+Result:
+- status: passed
+- `sacct -j 9551286` reports `COMPLETED 0:0`.
+- videos validate at 320x192, 33 frames, 16 FPS.
+- metrics:
+  - seed1000 latent MSE `0.29633891582489014` vs null
+    `1.9798624515533447`.
+  - seed1001 latent MSE `0.2788466513156891` vs null
+    `4.661829471588135`.
+- contact sheet:
+  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step1000_ep399_v0_s00004_s1000_1001/droid_full_bs5_step1000_eval_contact_sheet.jpg`
+
+Analysis:
+- The eval is clearly better than null, but visually worse than the completed
+  current-cache 10k eval. The table layout is recognizable, but mid/end frames
+  show stronger ghosting and object/robot smearing. This is acceptable for an
+  early step-1000 checkpoint on the full 1.44M-window cache.
+
+Next:
+- Continue monitoring `9541718` and launch another eval at step `2000`.

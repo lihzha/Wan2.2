@@ -74,6 +74,16 @@ sample set did not reveal an obvious easy low-rank structure. The practical
   short for all 10k steps at the observed `~13.6s/step`. `scontrol update` to
   48 hours was denied. Do not patch resume support until the user confirms the
   plan.
+- Full-cache batch-5 step-1000 eval job `9551286` completed cleanly using
+  `ckpt_step1000.pt`.
+  Local artifacts:
+  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step1000_ep399_v0_s00004_s1000_1001/`
+  Viz URL:
+  `http://localhost:8765/view?path=Wan2.2/_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step1000_ep399_v0_s00004_s1000_1001`
+  Metrics: seed1000 latent MSE `0.29633891582489014` vs null
+  `1.9798624515533447`; seed1001 latent MSE `0.2788466513156891` vs null
+  `4.661829471588135`. Visually better than null but worse than the
+  current-cache 10k eval, with stronger ghosting/object and robot smearing.
 
 The current research direction is scaling side-adapter training with fresh
 noise.
