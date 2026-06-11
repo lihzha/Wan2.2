@@ -2638,3 +2638,100 @@ Analysis:
 Next:
 - Commit/push the stale-accounting patch, update Della, and relaunch the cache
   submitter from `START_SHARD=985` with the same gputest settings.
+
+## 2026-06-11 04:40 PDT - Full DROID train cache complete
+
+Goal:
+- Finish the remaining DROID train-cache shards so the batch-size-5 full-cache
+  training waiter can launch the smoke/full training sequence.
+
+Hypothesis:
+- Resuming from `START_SHARD=985` after the stale `sacct` fix should complete
+  shards `985-1023` without recomputing already-finished shards.
+
+Change:
+- No code change in this attempt. Continued monitoring the patched submitter
+  from commit `b5b18e9`.
+
+Version Control:
+- implementation_commit: `b5b18e9`
+- remote_commit/status: `/scratch/gpfs/AM43/lz3952/Wan2.2` at `b5b18e9`
+- changed_files: `WORKLOG.md`
+
+Command / Job:
+- cache submitter PID: `322448`
+- cache submitter log:
+  `runs/droid_window_plans/train_cache_chunk_submitter_gputest_1024_resume_from_985_robust_20260611_062500.log`
+- final cache array: `9540854`
+- final shard range: `1009-1023`
+- batch-5 waiter PID: `318322`
+- batch-5 waiter log:
+  `runs/droid_window_plans/action_droid_training_submitter_resume_bs5.log`
+
+Result:
+- status: passed
+- verified cache counts: train `1,440,554/1,440,554`, val
+  `14,636/14,636`.
+- `sacct -j 9540854` reports all shard tasks `COMPLETED` with `ExitCode=0:0`.
+- shard logs for `1009-1023` end with `done ok=... skip=0 fail=0`.
+- submitter logged `job 9540854 completed cleanly` and
+  `all train-cache chunks submitted and completed`.
+
+Analysis:
+- The cache pipeline is complete; the earlier blockage was scheduler accounting
+  staleness, not data failure. The remaining gate is the batch-5 waiter polling
+  the completed counts and submitting the full-cache smoke job.
+
+Next:
+- Monitor PID `318322` until it submits the `DROID_BATCH_SIZE=5` full-cache
+  smoke job, then inspect that job's launch config and training logs before
+  allowing the full 10k batch-5 run to proceed.
+- Continue monitoring active current-cache job `9497852` through final
+  validation/eval at step `10000`.
+
+## 2026-06-11 04:55 PDT - Guard full-cache waiter job-id parsing
+
+Goal:
+- Prevent the full-cache waiter from launching the full DROID run before the
+  smoke job actually completes.
+
+Hypothesis:
+- `submit_sbatch` was logging the human-readable sbatch output to stdout inside
+  command substitution, so `smoke_job` contained both `Submitted batch job ...`
+  and the numeric job id. That made the wait/sacct checks ineffective.
+
+Change:
+- Updated `scripts/wait_and_submit_action_droid_training.sh` to call
+  `sbatch --parsable`, validate numeric Slurm job ids, retry briefly for the
+  primary `sacct` row after a job leaves `squeue`, and fail if no primary
+  accounting row exists.
+- Canceled accidentally-launched full batch-5 job `9541650` before any training
+  step logged.
+
+Version Control:
+- base_commit: `b5b18e9`
+- implementation_commit: pending
+- changed_files:
+  - `scripts/wait_and_submit_action_droid_training.sh`
+  - `WORKLOG.md`
+
+Command / Job:
+- validation: `bash -n scripts/wait_and_submit_action_droid_training.sh`
+- smoke job: `9541649`
+- canceled premature full job: `9541650`
+
+Result:
+- `9541650` was canceled after launch logging only; `sacct` reports
+  `CANCELLED by 363214`.
+- `9541649` is running with `batch_size=5`, `total_steps=5`,
+  `max_train_samples=128`, and output
+  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_smoke_bs5`.
+
+Analysis:
+- The batch-5 code path is still being tested by the smoke job. The incorrect
+  waiter success was an orchestration bug, not a training result.
+
+Next:
+- Commit/push the waiter guard, update the Della checkout, inspect smoke logs
+  to completion, and submit the full batch-5 run only after the smoke job has
+  real `COMPLETED 0:0` accounting plus train/val logs.

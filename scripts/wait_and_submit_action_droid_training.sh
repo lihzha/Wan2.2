@@ -43,15 +43,29 @@ count_dirs() {
 
 wait_for_job_clean() {
   local job_id=$1
+  if [[ ! "${job_id}" =~ ^[0-9]+$ ]]; then
+    log "invalid Slurm job id: ${job_id}"
+    exit 2
+  fi
   log "waiting for job ${job_id}"
   while squeue -h -j "${job_id}" | grep -q .; do
     squeue -j "${job_id}" -o "%.18i %.9P %.24j %.8T %.20M %.40R" | tee -a "${LOG_PATH}" || true
     sleep "${POLL_SECONDS}"
   done
   local bad=""
+  local saw_primary=0
+  local sacct_rows=""
+  for _ in {1..12}; do
+    sacct_rows=$(sacct -P -n -j "${job_id}" --format=JobID,State,ExitCode 2>/dev/null || true)
+    if printf '%s\n' "${sacct_rows}" | awk -F'|' '$1 != "" && $1 !~ /\.(batch|extern)$/ { found = 1 } END { exit(found ? 0 : 1) }'; then
+      break
+    fi
+    sleep 10
+  done
   while IFS='|' read -r row_job row_state row_exit; do
     [[ -n "${row_job}" ]] || continue
     [[ "${row_job}" =~ \.(batch|extern)$ ]] && continue
+    saw_primary=1
     if [[ "${row_state}" == "COMPLETED" && "${row_exit}" == "0:0" ]]; then
       continue
     fi
@@ -63,10 +77,14 @@ wait_for_job_clean() {
       fi
     fi
     bad+="${row_job}|${row_state}|${row_exit}"$'\n'
-  done < <(sacct -P -n -j "${job_id}" --format=JobID,State,ExitCode 2>/dev/null || true)
+  done <<< "${sacct_rows}"
   if [[ -n "${bad}" ]]; then
     log "job ${job_id} had non-clean tasks:"
     echo "${bad}" | tee -a "${LOG_PATH}"
+    exit 1
+  fi
+  if (( saw_primary == 0 )); then
+    log "job ${job_id} has no primary sacct row"
     exit 1
   fi
   log "job ${job_id} completed cleanly"
@@ -74,9 +92,15 @@ wait_for_job_clean() {
 
 submit_sbatch() {
   local out
-  out=$(sbatch "$@")
-  echo "${out}" | tee -a "${LOG_PATH}"
-  echo "${out}" | awk '{print $4}'
+  local job_id
+  out=$(sbatch --parsable "$@")
+  job_id=${out%%;*}
+  if [[ ! "${job_id}" =~ ^[0-9]+$ ]]; then
+    log "sbatch did not return a numeric job id: ${out}"
+    exit 2
+  fi
+  log "Submitted batch job ${job_id}"
+  echo "${job_id}"
 }
 
 if [[ ! -f "${TRAIN_SUMMARY}" || ! -f "${VAL_SUMMARY}" ]]; then
