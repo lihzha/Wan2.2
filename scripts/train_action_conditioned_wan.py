@@ -131,46 +131,69 @@ def rollout_loss(
     actions = batch["actions"].to(device, non_blocking=True).float()
     z_i0 = batch["z_I0"].to(device, non_blocking=True).float()
     z_video_b = batch["z_video"].to(device, non_blocking=True).float()
-    if z_video_b.shape[0] != 1:
-        raise ValueError("this overfit script expects batch_size=1")
+    batch_size = z_video_b.shape[0]
+    if z_init_noise.dim() == z_video_b.dim() - 1:
+        if batch_size != 1:
+            raise ValueError(
+                "unbatched z_init_noise is only valid with batch_size=1")
+        z_init_noise_b = z_init_noise.unsqueeze(0)
+    else:
+        z_init_noise_b = z_init_noise
+    if z_init_noise_b.shape != z_video_b.shape:
+        raise ValueError(
+            f"z_init_noise shape {tuple(z_init_noise_b.shape)} must match "
+            f"z_video shape {tuple(z_video_b.shape)}")
 
-    z_video = z_video_b[0]
-    _, fz, _, _ = z_video.shape
-    z_i0_full = z_i0[0].expand(-1, fz, -1, -1).contiguous()
-    z = ES._apply_first_frame_pin(z_init_noise, z_i0_full, mask2)
+    _, _, fz, _, _ = z_video_b.shape
+    if z_i0.shape[2] == 1:
+        z_i0_full = z_i0.expand(-1, -1, fz, -1, -1).contiguous()
+    elif z_i0.shape[2] == fz:
+        z_i0_full = z_i0.contiguous()
+    else:
+        raise ValueError(
+            f"z_I0 temporal shape {tuple(z_i0.shape)} is not 1 or {fz}")
+    z = ES._apply_first_frame_pin(z_init_noise_b, z_i0_full, mask2.unsqueeze(0))
     mask2_zero = mask2[0]
+    context = [null_context for _ in range(batch_size)]
 
     for i in range(len(sigmas) - 1):
         sigma_i = sigmas[i].item()
         sigma_ip1 = sigmas[i + 1].item()
         timestep = ES._format_timestep(
             sigma_i, pipe.num_train_timesteps, mask2_zero, seq_len, device)
+        timestep = timestep.expand(batch_size, -1).contiguous()
+        z_list = [z_b for z_b in z]
         with torch.amp.autocast("cuda", dtype=pipe.param_dtype):
             v_cond = model(
-                x=[z],
+                x=z_list,
                 t=timestep,
-                context=[null_context],
+                context=context,
                 seq_len=seq_len,
                 actions=actions,
-            )[0].float()
+            )
+            v_cond = torch.stack(v_cond, dim=0).float()
         if abs(guide_scale - 1.0) > 1e-6:
             with torch.no_grad():
-                v_uncond = ES._dit_velocity(
-                    pipe, z.detach(), sigma_i, [null_context], seq_len,
-                    mask2_zero, pipe.param_dtype)
+                v_uncond = pipe.model(
+                    [z_b.detach() for z_b in z],
+                    t=timestep,
+                    context=context,
+                    seq_len=seq_len,
+                )
+                v_uncond = torch.stack(v_uncond, dim=0).float()
             v = v_uncond + guide_scale * (v_cond - v_uncond)
         else:
             v = v_cond
         z = ES._apply_first_frame_pin(
-            z + (sigma_ip1 - sigma_i) * v, z_i0_full, mask2)
+            z + (sigma_ip1 - sigma_i) * v, z_i0_full, mask2.unsqueeze(0))
 
-    loss = F.mse_loss(z, z_video)
+    loss = F.mse_loss(z, z_video_b)
     logs = {
         "loss": float(loss.item()),
         "latent_mse": float(loss.item()),
         "z_pred_std": float(z.detach().std().item()),
-        "z_target_std": float(z_video.detach().std().item()),
-        "z_init_std": float(z_init_noise.detach().std().item()),
+        "z_target_std": float(z_video_b.detach().std().item()),
+        "z_init_std": float(z_init_noise_b.detach().std().item()),
     }
     return loss, logs
 
