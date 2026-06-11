@@ -98,7 +98,10 @@ def cleanup_distributed(distributed: bool) -> None:
 
 def barrier(distributed: bool) -> None:
     if distributed and dist.is_initialized():
-        dist.barrier()
+        kwargs = {}
+        if torch.cuda.is_available():
+            kwargs["device_ids"] = [torch.cuda.current_device()]
+        dist.barrier(**kwargs)
 
 
 def rank0_print(dist_info: dict, *args, **kwargs) -> None:

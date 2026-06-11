@@ -3129,3 +3129,56 @@ Next:
   replace dependent jobs.
 - Continue monitoring active single-GPU run `9541718`; launch/fetch step-3000
   eval when its checkpoint appears.
+
+## 2026-06-11 15:58 PDT - DDP 2-GPU smoke passed, barrier warning fix
+
+Goal:
+- Inspect the first distributed smoke and remove any warning that could become
+  a larger-world-size hang risk before launching the 8-GPU smoke.
+
+Hypothesis:
+- The DDP trainer works functionally, but the NCCL barrier should specify the
+  rank-local CUDA device to avoid ambiguous device mapping warnings.
+
+Change:
+- Updated the distributed barrier helper to pass
+  `device_ids=[torch.cuda.current_device()]` when CUDA is available.
+- Canceled pending old jobs `9564219` and `9564220` so replacement 8-GPU jobs
+  can run from a new immutable commit.
+
+Version Control:
+- branch: `codex/droid-ddp-8gpu`
+- base_commit: `062743f`
+- implementation_commit: `PENDING_BARRIER_FIX_COMMIT`
+- changed_files:
+  - `scripts/train_action_conditioned_wan_droid.py`
+  - `WORKLOG.md`
+
+Command / Job:
+- completed smoke job: `9564218`
+- canceled old dependent jobs: `9564219`, `9564220`
+- local checks:
+  `git diff --check -- scripts/train_action_conditioned_wan_droid.py`
+  `/usr/bin/python3 -m py_compile scripts/train_action_conditioned_wan_droid.py`
+
+Result:
+- status: 2-GPU smoke passed; barrier patch static-check passed.
+- `sacct -j 9564218` reports `COMPLETED 0:0`, elapsed `00:01:55`.
+- Smoke output:
+  - distributed `True`, world size `2`
+  - local batch `1`, global batch `2`
+  - one training step loss `0.306015`
+  - validation loss `1.511151`
+  - checkpoint and summary completed.
+- stderr only showed deprecation warnings, one NCCL barrier device warning, and
+  a non-fatal DDP grad-stride performance warning.
+
+Analysis:
+- Functional DDP wiring is validated for two ranks.
+- The barrier warning is easy to remove and should be fixed before the 8-rank
+  smoke. The grad-stride warning is performance-only and does not require
+  blocking the 8-GPU smoke.
+
+Next:
+- Commit/push the barrier fix, deploy a new isolated Della worktree commit, and
+  submit replacement 8-GPU smoke plus dependent 8-GPU full run.

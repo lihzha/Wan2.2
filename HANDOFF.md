@@ -60,8 +60,13 @@ sample set did not reveal an obvious easy low-rank structure. The practical
   untracked runtime assets. Remote compile/import checks and manual focused
   action-conditioner tests passed `11/11`.
 - DDP Slurm chain is queued from the isolated worktree:
-  `9564218` `act-ddp2-smoke` -> `9564219` `act-ddp8-smoke` ->
-  `9564220` `act-ddp8-10k`.
+  `9564218` `act-ddp2-smoke` completed cleanly (`COMPLETED 0:0`, elapsed
+  `00:01:55`). It validated world size 2 DDP with one optimizer step and
+  rank-0-only validation/checkpointing. The first 8-GPU smoke/full jobs
+  (`9564219`, `9564220`) were canceled before start to patch a non-fatal NCCL
+  barrier device warning. Replacement 8-GPU jobs should be launched from the
+  new barrier-fix commit.
+  Original chain was `9564218` -> `9564219` -> `9564220`.
   The full 8-GPU run uses local batch `5`, global batch `40`, LR `5e-5`,
   10k optimizer steps, 25 diffusion steps, and full train/val manifests.
   Dependent jobs must be canceled/replaced if a smoke fails.
