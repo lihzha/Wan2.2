@@ -2954,3 +2954,55 @@ Analysis:
 
 Next:
 - Continue monitoring `9541718` and launch another eval at step `2000`.
+
+## 2026-06-11 14:35 PDT - Full-cache batch-5 step-2000 eval
+
+Goal:
+- Validate the second full-cache batch-size-5 checkpoint and compare it with
+  step 1000.
+
+Hypothesis:
+- If training is progressing, step-2000 validation and fixed eval MSE should
+  improve versus step 1000, though qualitative robot smear may remain.
+
+Change:
+- No source change. Copied `ckpt_latest.pt` to `ckpt_step2000.pt` before eval.
+
+Version Control:
+- implementation_commit: `841aa65`
+- changed_files:
+  - `WORKLOG.md`
+  - `HANDOFF.md`
+
+Command / Job:
+- eval job: `9557082`
+- checkpoint:
+  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/ckpt_step2000.pt`
+- remote videos:
+  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step2000_ep399_v0_s00004_s1000_1001/`
+- local videos:
+  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step2000_ep399_v0_s00004_s1000_1001/`
+- viz-open:
+  `http://localhost:8765/view?path=Wan2.2/_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step2000_ep399_v0_s00004_s1000_1001`
+
+Result:
+- training validation improved from `0.2770900116302073` at step 1000 to
+  `0.24543552426621318` at step 2000.
+- eval job `9557082` completed with `ExitCode=0:0`.
+- videos validate at 320x192, 33 frames, 16 FPS.
+- metrics:
+  - seed1000 latent MSE `0.27191445231437683` vs null
+    `1.9798624515533447`.
+  - seed1001 latent MSE `0.2750750482082367` vs null
+    `4.661829471588135`.
+- contact sheet:
+  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step2000_ep399_v0_s00004_s1000_1001/droid_full_bs5_step2000_eval_contact_sheet.jpg`
+
+Analysis:
+- Step 2000 is a real numeric improvement over step 1000, especially seed1000
+  (`0.2963 -> 0.2719`). Qualitatively, the same robot/gripper haze remains in
+  mid/end frames; the table/object layout is recognizable and null remains much
+  worse.
+
+Next:
+- Continue monitoring `9541718`; next validation/eval target is step `3000`.

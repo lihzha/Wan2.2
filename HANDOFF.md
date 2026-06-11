@@ -84,6 +84,17 @@ sample set did not reveal an obvious easy low-rank structure. The practical
   `1.9798624515533447`; seed1001 latent MSE `0.2788466513156891` vs null
   `4.661829471588135`. Visually better than null but worse than the
   current-cache 10k eval, with stronger ghosting/object and robot smearing.
+- Full-cache batch-5 step-2000 validation improved to
+  `0.24543552426621318`. Step-2000 eval job `9557082` completed cleanly using
+  `ckpt_step2000.pt`.
+  Local artifacts:
+  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step2000_ep399_v0_s00004_s1000_1001/`
+  Viz URL:
+  `http://localhost:8765/view?path=Wan2.2/_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step2000_ep399_v0_s00004_s1000_1001`
+  Metrics: seed1000 latent MSE `0.27191445231437683` vs null
+  `1.9798624515533447`; seed1001 latent MSE `0.2750750482082367` vs null
+  `4.661829471588135`. Numerically improved from step 1000; visually the
+  robot/gripper haze remains.
 
 The current research direction is scaling side-adapter training with fresh
 noise.
