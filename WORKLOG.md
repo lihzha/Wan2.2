@@ -607,6 +607,88 @@ Next:
 - Continue monitoring DROID training job `9497852` and the cache submitter /
   full-cache waiter.
 
+## 2026-06-10 21:57 PDT - DROID Step 7000 Eval
+
+Goal:
+- Validate the periodic step-7000 eval from the current-cache DROID training
+  run and compare it against step `6000`.
+
+Hypothesis:
+- Even if step-7000 validation is not a new best, `ckpt_latest.pt` may still
+  improve qualitative or held-out random-noise behavior on the fixed eval
+  sample.
+
+Change:
+- Periodic watcher `1953264` detected step `7000`, waited for
+  `ckpt_latest.pt` to update, submitted eval job `9534318`, and then moved on
+  to wait for step `8000`.
+- Fetched MP4s, `metrics.json`, updated train/val logs, and Slurm logs into
+  ignored local `_cluster/` paths.
+- Generated `droid_step7000_eval_contact_sheet.jpg` and opened the local eval
+  directory with `viz-open`.
+
+Version Control:
+- branch: `main`
+- base_commit: `6338aec4a92290c2e29d87e2f7c66f24e413301a`
+- implementation_commit: pending worklog-only update
+- push/pull: no source deployment; remote active jobs remain on
+  `79554b590d0579be0d2dbe94bd0e74dc1ea5f7ff`
+- changed_files: `WORKLOG.md`; ignored fetched artifacts under `_cluster/`
+- remote_commit/status: not re-pulled while active jobs are running.
+
+Command / Job:
+- command: periodic watcher submitted
+  `sbatch --job-name=act-droid-eval-s7000 ... export_action_conditioned_wan_video.py --ckpt_path .../ckpt_latest.pt --triplets_root data/droid_cache_windows_v0/val --overfit_one ep399_v0_s00004 --eval_noise_mode random --eval_seed_start 1000 --num_eval_noises 2 --include_null`
+- job_id: `9534318`
+- run_dir:
+  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_currentcache_414835_20260610_042850_10k`
+- logs:
+  `_cluster/slurm_outputs/action-droid/out_act-droid-eval-s7000_9534318.log`,
+  `_cluster/slurm_outputs/action-droid/err_act-droid-eval-s7000_9534318.log`
+- artifacts:
+  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_currentcache_414835_20260610_042850_10k/videos_latest_step7000_ep399_v0_s00004_s1000_1001/`
+  including `ground_truth.mp4`, `sample_seed1000..1001.mp4`,
+  `null_only_seed1000..1001.mp4`, `metrics.json`, and
+  `droid_step7000_eval_contact_sheet.jpg`.
+
+Result:
+- status: passed, active monitoring continues
+- metrics/artifacts:
+  - Training job `9497852` was still running and had reached step `7020` at the
+    post-eval snapshot.
+  - Validation at step `7000` was `0.2071253014728427`, slightly worse than the
+    step-6000 best `0.20653978269547224` but still better than step `5000`.
+  - Step `7000` train loss was `0.180847`.
+  - Job `9534318` completed `0:0` in `00:02:05`.
+  - DROID step-7000 eval latent MSEs:
+    - seed1000 `0.231918` vs null `1.97986`
+    - seed1001 `0.236279` vs null `4.66183`
+  - All step-7000 MP4s are `320x192`, `33` frames, `16 fps`, duration
+    `2.0625s`.
+  - `viz-open` URL:
+    `http://localhost:8765/view?path=Wan2.2/_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_currentcache_414835_20260610_042850_10k/videos_latest_step7000_ep399_v0_s00004_s1000_1001`
+  - Periodic watcher `1953264` is alive and waiting for step `8000`.
+  - Cache waiter latest count at the post-eval snapshot:
+    `1166216/1440554` train and `14636/14636` val.
+- key evidence: local `metrics.json`, fetched MP4s, Slurm logs, contact sheet,
+  and remote watcher log.
+
+Analysis:
+- Step-7000 validation did not beat step 6000, but the held-out random-noise
+  eval did improve slightly: seed1000 improved from `0.237017` to `0.231918`,
+  and seed1001 improved from `0.237107` to `0.236279`.
+- Visual quality remains similar to step 6000: samples preserve the tabletop
+  scene and are far better than null-only outputs, but late frames remain cloudy
+  and robot-arm motion is still not cleanly reproduced.
+- Continuing training is still justified; there is no divergence, OOM, or
+  traceback, and eval quality has not regressed.
+
+Next:
+- Continue monitoring training job `9497852` through step `8000`; periodic
+  watcher `1953264` should submit the next eval automatically.
+- Fetch, validate, visualize, and record the step-8000 eval once it completes.
+- Continue cache/full-cache waiter monitoring.
+
 ## 2026-06-08 - Initial Della Development Loop
 
 Goal:
