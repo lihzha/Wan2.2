@@ -67,6 +67,11 @@ sample set did not reveal an obvious easy low-rank structure. The practical
   barrier device warning. Replacement 8-GPU jobs should be launched from the
   new barrier-fix commit.
   Original chain was `9564218` -> `9564219` -> `9564220`.
+  Replacement worktree:
+  `/scratch/gpfs/AM43/lz3952/worktrees/Wan2.2/codex-droid-ddp-8gpu-barrierfix`
+  at `7cb94a9671926d12f20b253d64ad37152795f577`.
+  Replacement jobs: `9565756` `act-ddp8-smoke` ->
+  `9565757` `act-ddp8-10k`.
   The full 8-GPU run uses local batch `5`, global batch `40`, LR `5e-5`,
   10k optimizer steps, 25 diffusion steps, and full train/val manifests.
   Dependent jobs must be canceled/replaced if a smoke fails.

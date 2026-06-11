@@ -3182,3 +3182,51 @@ Analysis:
 Next:
 - Commit/push the barrier fix, deploy a new isolated Della worktree commit, and
   submit replacement 8-GPU smoke plus dependent 8-GPU full run.
+
+## 2026-06-11 16:03 PDT - Replacement 8-GPU DDP queue
+
+Goal:
+- Relaunch the 8-GPU smoke/full chain from the barrier-fix commit.
+
+Hypothesis:
+- The barrier-fix commit should preserve the successful 2-GPU behavior while
+  eliminating the NCCL ambiguous-device warning before the 8-rank smoke.
+
+Change:
+- Created new isolated Della worktree:
+  `/scratch/gpfs/AM43/lz3952/worktrees/Wan2.2/codex-droid-ddp-8gpu-barrierfix`
+  at commit `7cb94a9671926d12f20b253d64ad37152795f577`.
+- Linked untracked runtime assets from the canonical checkout.
+
+Version Control:
+- branch: `codex/droid-ddp-8gpu`
+- launch_commit: `7cb94a9671926d12f20b253d64ad37152795f577`
+- remote_commit/status: detached at `7cb94a9671926d12f20b253d64ad37152795f577`;
+  untracked symlinks for `.venv`, `Wan2.2-TI2V-5B`, and `data`.
+
+Command / Job:
+- remote checks:
+  - `bash -n run_action_conditioned_droid_dist.sh`
+  - `.venv/bin/python -m py_compile scripts/train_action_conditioned_wan_droid.py`
+- replacement queue:
+  - 8-GPU smoke job `9565756`, output
+    `runs/action_droid_dist_ddp8_smoke_7cb94a9`
+  - 8-GPU full job `9565757`, dependency `afterok:9565756`, output
+    `runs/action_droid_dist_side_bn512h8_L0-29_fresh_25step_fullcache_10k_lr5e-5_bs5x8_ddp_7cb94a9`
+
+Result:
+- status: queued
+- `squeue` shows `9565756` pending with reason `(None)` and `9565757` pending
+  with reason `(Dependency)`.
+- `squeue --start` did not yet provide a concrete start time for `9565756`.
+
+Analysis:
+- The full 8-GPU run remains guarded by the smoke dependency.
+- The active single-GPU run `9541718` continues independently from the
+  canonical Della checkout.
+
+Next:
+- Monitor `9565756`. If it passes, allow `9565757` to proceed and inspect
+  launch logs early. If it fails, cancel `9565757`, patch, and resubmit.
+- Continue monitoring `9541718`; trigger step-3000 eval when checkpoint is
+  written.
