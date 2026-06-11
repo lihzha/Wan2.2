@@ -3067,3 +3067,65 @@ Next:
 - Commit and push the DDP branch, deploy the exact commit to an isolated Della
   worktree, run a short distributed smoke, inspect logs/checkpoints, then submit
   the full 8-GPU training run if the smoke is clean.
+
+## 2026-06-11 15:27 PDT - DDP smoke and 8-GPU training queue
+
+Goal:
+- Queue a safe distributed-training launch chain that validates DDP before any
+  full 8-GPU training starts.
+
+Hypothesis:
+- A one-step, one-diffusion-step smoke is enough to catch rank/device/DDP
+  wiring problems before committing 8 H200s to the 25-step full run.
+
+Change:
+- No source change after commit `f284b18340e1d111bcb30b31fd07a4ed8da0ecfc`.
+- Created isolated Della worktree:
+  `/scratch/gpfs/AM43/lz3952/worktrees/Wan2.2/codex-droid-ddp-8gpu`
+  at commit `f284b18340e1d111bcb30b31fd07a4ed8da0ecfc`.
+- Linked untracked runtime assets from the canonical checkout:
+  `.venv`, `Wan2.2-TI2V-5B`, and `data`.
+
+Version Control:
+- branch: `codex/droid-ddp-8gpu`
+- launch_commit: `f284b18340e1d111bcb30b31fd07a4ed8da0ecfc`
+- remote_commit/status: detached at `f284b18340e1d111bcb30b31fd07a4ed8da0ecfc`;
+  untracked symlinks for runtime assets only.
+
+Command / Job:
+- remote validation:
+  - `bash -n run_action_conditioned_droid_dist.sh`
+  - `.venv/bin/python -m py_compile scripts/train_action_conditioned_wan_droid.py`
+  - manual invocation of all `tests/test_action_conditioned_wan.py::test_*`
+    functions because `pytest` is not installed in the Della venv.
+- queued Slurm chain:
+  - 2-GPU smoke job `9564218`, output
+    `runs/action_droid_dist_ddp2_smoke_f284b18`
+  - 8-GPU smoke job `9564219`, dependency `afterok:9564218`, output
+    `runs/action_droid_dist_ddp8_smoke_f284b18`
+  - 8-GPU full training job `9564220`, dependency `afterok:9564219`, output
+    `runs/action_droid_dist_side_bn512h8_L0-29_fresh_25step_fullcache_10k_lr5e-5_bs5x8_ddp_f284b18`
+
+Result:
+- status: queued
+- Remote validation passed. Manual focused tests passed `11/11`.
+- Slurm accepted all jobs. Initial queue state:
+  - `9564218` pending, reason `(None)`
+  - `9564219` pending, reason `(Dependency)`
+  - `9564220` pending, reason `(Dependency)`
+- Route probes estimated short smoke starts around `2026-06-13` and long
+  8-GPU full-duration starts around `2026-06-18`, but live queue should be
+  rechecked rather than trusted.
+
+Analysis:
+- Submitting the dependent full run now preserves queue position without
+  allowing it to start before DDP smoke validation.
+- The 8-GPU run uses local batch `5`, global batch `40`, LR `5e-5`, 10k
+  optimizer steps, 25 diffusion steps, and full train/val manifests.
+
+Next:
+- Monitor jobs `9564218`, `9564219`, and `9564220`.
+- If smoke fails, inspect logs, patch on a new commit/worktree, and cancel or
+  replace dependent jobs.
+- Continue monitoring active single-GPU run `9541718`; launch/fetch step-3000
+  eval when its checkpoint appears.

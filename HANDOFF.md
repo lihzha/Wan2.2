@@ -54,10 +54,17 @@ sample set did not reveal an obvious easy low-rank structure. The practical
   `bash -n run_action_conditioned_droid_dist.sh`,
   `bash -n run_action_conditioned_droid.sh`, and
   `/usr/bin/python3 -m py_compile scripts/train_action_conditioned_wan_droid.py`.
-  Della accepted an 8-GPU `ailab` allocation shape via `sbatch --test-only`,
-  but estimated a late start (`2026-06-12T23:38:58` at probe time).
-  Next step is an isolated Della worktree plus short DDP smoke before full
-  8-GPU training.
+  Della worktree:
+  `/scratch/gpfs/AM43/lz3952/worktrees/Wan2.2/codex-droid-ddp-8gpu`,
+  detached at `f284b18340e1d111bcb30b31fd07a4ed8da0ecfc`, with symlinks for
+  untracked runtime assets. Remote compile/import checks and manual focused
+  action-conditioner tests passed `11/11`.
+- DDP Slurm chain is queued from the isolated worktree:
+  `9564218` `act-ddp2-smoke` -> `9564219` `act-ddp8-smoke` ->
+  `9564220` `act-ddp8-10k`.
+  The full 8-GPU run uses local batch `5`, global batch `40`, LR `5e-5`,
+  10k optimizer steps, 25 diffusion steps, and full train/val manifests.
+  Dependent jobs must be canceled/replaced if a smoke fails.
 
 - Max-fit DROID batch size on the current single-H200 setup is `5`.
   A real optimizer-step profiler showed batch sizes `6`, `7`, and `8` OOM,
