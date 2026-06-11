@@ -2853,3 +2853,51 @@ Next:
   optimizer for future checkpoints).
 - Continue monitoring `9541718`; first major checkpoint/validation is expected
   at step `1000`.
+
+## 2026-06-11 08:55 PDT - Full-cache batch-5 first validation
+
+Goal:
+- Verify that the full-cache batch-size-5 run survives through its first
+  checkpoint and validation.
+
+Hypothesis:
+- If the batch-size patch is sound beyond smoke, the first 1000 steps should
+  complete without OOM/NaN and write both latest and best-val checkpoints.
+
+Change:
+- No source change. Continued read-only monitoring of job `9541718`.
+
+Version Control:
+- implementation_commit: `887bfd1`
+- changed_files:
+  - `WORKLOG.md`
+  - `HANDOFF.md`
+
+Command / Job:
+- active job: `9541718` `act-droid-win-10k`
+- run dir:
+  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5`
+- logs:
+  `slurm_outputs/action-droid/out_act-droid-win-10k_9541718.log`,
+  `slurm_outputs/action-droid/err_act-droid-win-10k_9541718.log`
+
+Result:
+- status: passed first validation; job still running
+- step `1000` train loss: `0.3422377109527588`
+- step `1000` val loss: `0.2770900116302073` over `32` val samples
+- job continued to at least step `1020`.
+- `ckpt_latest.pt` and `ckpt_best_val.pt` were written at step 1000, both
+  about `914M`.
+- stderr/error scan has no traceback, OOM, or NaN hits.
+
+Analysis:
+- Batch size `5` is viable beyond smoke and through checkpoint/validation.
+  Early full-cache validation is higher than the old current-cache run's late
+  validation, as expected for a fresh run at only 1000 steps on the much larger
+  cache.
+- The walltime concern remains: 36 hours is likely short for 10k steps at the
+  observed `~13.6s/step`, and Slurm denied extending the running job.
+
+Next:
+- Continue monitoring `9541718`; next validation/checkpoint is step `2000`.
+- Await user confirmation before implementing resume support.

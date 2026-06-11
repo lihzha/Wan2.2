@@ -68,10 +68,12 @@ sample set did not reveal an obvious easy low-rank structure. The practical
 - Active full-cache batch-5 job:
   `9541718` `act-droid-win-10k`, node `della-i21g3`, run dir
   `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5`.
-  It is healthy through at least step `120`, but its 36-hour wall time is likely
-  too short for all 10k steps at the observed `~13.6s/step`. `scontrol update`
-  to 48 hours was denied. Do not patch resume support until the user confirms
-  the plan.
+  It is healthy through at least step `1020`. First validation at step `1000`
+  is `0.2770900116302073`; `ckpt_latest.pt` and `ckpt_best_val.pt` were written
+  at step `1000` and are about `914M` each. Its 36-hour wall time is likely too
+  short for all 10k steps at the observed `~13.6s/step`. `scontrol update` to
+  48 hours was denied. Do not patch resume support until the user confirms the
+  plan.
 
 The current research direction is scaling side-adapter training with fresh
 noise.
