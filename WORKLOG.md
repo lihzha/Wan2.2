@@ -519,6 +519,94 @@ Next:
   again, then compare videos and latent MSE against the step-5000 eval.
 - Continue cache monitoring; full train cache is still incomplete.
 
+## 2026-06-10 19:32 PDT - DROID Step 6000 Eval And Periodic Watcher
+
+Goal:
+- Launch and validate the next periodic eval for the current-cache DROID run
+  after step `6000`, then arm future evals without requiring per-job user
+  confirmation.
+
+Hypothesis:
+- If the validation improvement at step `6000` is real, the current checkpoint
+  should improve held-out random-noise latent MSE versus the step-5000 eval and
+  remain clearly better than the null-context baseline.
+
+Change:
+- Added a remote login-side watcher for step `6000`; it waited for
+  `val_log.csv` to contain the step-6000 row and for `ckpt_latest.pt` to update
+  before submitting the eval.
+- After the step-6000 eval completed and was inspected locally, launched a
+  second remote watcher for future periodic evals at steps `7000`, `8000`,
+  `9000`, and `10000`.
+- No source code changes. Fetched eval videos, metrics, train/val logs, and
+  Slurm logs into ignored local `_cluster/` paths. Opened fetched eval
+  directories with local `viz-open`.
+
+Version Control:
+- branch: `main`
+- base_commit: `e2f6cff6f04c72d0b94981d396386c46b086c671`
+- implementation_commit: pending worklog-only update
+- push/pull: no source deployment; remote active jobs remain on
+  `79554b590d0579be0d2dbe94bd0e74dc1ea5f7ff`
+- changed_files: `WORKLOG.md`; ignored fetched artifacts under `_cluster/`
+- remote_commit/status: not re-pulled while active jobs are running.
+
+Command / Job:
+- command: remote watcher
+  `runs/droid_window_plans/eval_watcher_droid_step6000_20260610_214040.log`
+  submitted
+  `sbatch --job-name=act-droid-eval-s6000 ... export_action_conditioned_wan_video.py --ckpt_path .../ckpt_latest.pt --triplets_root data/droid_cache_windows_v0/val --overfit_one ep399_v0_s00004 --eval_noise_mode random --eval_seed_start 1000 --num_eval_noises 2 --include_null`
+- job_id: `9529887`
+- run_dir:
+  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_currentcache_414835_20260610_042850_10k`
+- logs:
+  `_cluster/slurm_outputs/action-droid/out_act-droid-eval-s6000_9529887.log`,
+  `_cluster/slurm_outputs/action-droid/err_act-droid-eval-s6000_9529887.log`
+- artifacts:
+  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_currentcache_414835_20260610_042850_10k/videos_latest_step6000_ep399_v0_s00004_s1000_1001/`
+  including `ground_truth.mp4`, `sample_seed1000..1001.mp4`,
+  `null_only_seed1000..1001.mp4`, `metrics.json`, and
+  `droid_step6000_eval_contact_sheet.jpg`.
+
+Result:
+- status: passed, active monitoring continues
+- metrics/artifacts:
+  - Training job `9497852` remained running after step `6000`.
+  - Validation improved to `0.20653978269547224` at step `6000`, from
+    `0.2223765980452299` at step `5000`; this is the new best validation loss.
+  - Step `6000` train loss was `0.243960`.
+  - Job `9529887` completed `0:0` in `00:03:34`.
+  - DROID step-6000 eval latent MSEs:
+    - seed1000 `0.237017` vs null `1.97986`
+    - seed1001 `0.237107` vs null `4.66183`
+  - All step-6000 MP4s are `320x192`, `33` frames, `16 fps`, duration
+    `2.0625s`.
+  - `viz-open` URL:
+    `http://localhost:8765/view?path=Wan2.2/_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_currentcache_414835_20260610_042850_10k/videos_latest_step6000_ep399_v0_s00004_s1000_1001`
+  - Future periodic watcher PID `1953264` is running and waiting for step
+    `7000`; log:
+    `runs/droid_window_plans/periodic_eval_watcher_droid_current_20260610_223224.log`.
+- key evidence: local `metrics.json`, fetched MP4s, Slurm logs, and contact
+  sheet under `_cluster/`.
+
+Analysis:
+- The step-6000 eval is a measurable improvement over step 5000 on the same
+  held-out sample and random seeds: latent MSE dropped from about `0.252` to
+  about `0.237`.
+- Visual quality also remains much better than null-only generation. The
+  samples preserve the table/object layout, while null runs collapse into
+  saturated geometric artifacts. The main remaining qualitative failure is that
+  middle/late frames are still cloudy and robot arm motion is not cleanly
+  reproduced.
+- The current-cache DROID run is still learning useful signal and should
+  continue to the next validation checkpoints.
+
+Next:
+- Monitor periodic eval watcher `1953264`; fetch, validate, and visualize each
+  new eval output at steps `7000`, `8000`, `9000`, and `10000`.
+- Continue monitoring DROID training job `9497852` and the cache submitter /
+  full-cache waiter.
+
 ## 2026-06-08 - Initial Della Development Loop
 
 Goal:
