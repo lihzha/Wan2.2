@@ -2492,3 +2492,94 @@ See `HANDOFF.md` for the concise handoff. At minimum:
    final paths.
 7. If `9497851` passed, monitor `9497852`. If `9497851` failed, debug before
    allowing the full run to proceed.
+
+## 2026-06-11 03:15 PDT - H200 DROID batch-size probe and step9000 eval
+
+Goal:
+- Determine the largest real DROID action-conditioned rollout training batch
+  that fits the current single-H200 allocation, and keep the active eval/cache
+  loop documented.
+
+Hypothesis:
+- The current code path was artificially limited to `batch_size=1`; after
+  vectorizing the closed-loop rollout over Wan's list-of-samples API, the H200
+  may fit a larger batch, but the exact limit needs an optimizer-step probe.
+
+Change:
+- Added batched rollout support in `scripts/train_action_conditioned_wan.py`.
+- Updated DROID noise creation in
+  `scripts/train_action_conditioned_wan_droid.py` to return one `z_init` per
+  sample.
+- Added `scripts/profile_action_droid_batch_size.py` for one-step GPU memory
+  profiling.
+- Added `DROID_BATCH_SIZE` to
+  `scripts/wait_and_submit_action_droid_training.sh` so the full-cache waiter
+  can submit future smoke/full training with an explicit batch size.
+
+Version Control:
+- agent_id: main orchestrator
+- worktree: `/home/lzha/code/Wan2.2`
+- probe_worktree: `/home/lzha/code/Wan2.2-batchsize-probe`
+- branch: `main`; probe branch `codex/batchsize-probe-20260611`
+- base_commit: `2e67e07`
+- probe_commits: `3154e5f`, `b12e415`
+- implementation_commit: pending
+- remote_probe_commit: `b12e415` at
+  `/scratch/gpfs/AM43/lz3952/worktrees/Wan2.2/codex-batchsize-probe-20260611`
+- changed_files:
+  - `scripts/train_action_conditioned_wan.py`
+  - `scripts/train_action_conditioned_wan_droid.py`
+  - `scripts/profile_action_droid_batch_size.py`
+  - `scripts/wait_and_submit_action_droid_training.sh`
+  - `WORKLOG.md`
+
+Command / Job:
+- validation:
+  - `python3 -m py_compile scripts/train_action_conditioned_wan.py scripts/train_action_conditioned_wan_droid.py scripts/profile_action_droid_batch_size.py`
+  - `bash -n scripts/wait_and_submit_action_droid_training.sh`
+- profile jobs:
+  - `9540013` failed before memory measurement due missing autocast in the
+    new batched unconditional path.
+  - `9540057` reran high-to-low batch sizes on an H200.
+- profile result JSONL:
+  `_cluster/batch_size_probe_h200/profile_h200_current_shape_9540057_20260611_060506.jsonl`
+- step9000 eval:
+  - job: `9539937`
+  - local videos:
+    `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_currentcache_414835_20260610_042850_10k/videos_latest_step9000_ep399_v0_s00004_s1000_1001/`
+  - viz-open:
+    `http://localhost:8765/view?path=Wan2.2/_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_currentcache_414835_20260610_042850_10k/videos_latest_step9000_ep399_v0_s00004_s1000_1001`
+
+Result:
+- status: passed
+- batch-size profile:
+  - `batch_size=8`: OOM, PyTorch allocated `137.85 GiB`.
+  - `batch_size=7`: OOM, PyTorch allocated `136.97 GiB`.
+  - `batch_size=6`: OOM, PyTorch allocated `137.14 GiB`.
+  - `batch_size=5`: passed, max allocated `133,937.6 MiB`, max reserved
+    `135,538.0 MiB`, free after step `6,851.1 MiB`.
+- conclusion: exact max-fit batch size for the current H200/25-step side
+  adapter setup is `5`; `4` is the conservative option with more headroom.
+- step9000 eval:
+  - validation loss improved to `0.19321248633787036`.
+  - seed1000 latent MSE `0.21804796159267426` vs null `1.9798624515533447`.
+  - seed1001 latent MSE `0.22290533781051636` vs null `4.661829471588135`.
+  - videos validate at 320x192, 33 frames, 16 FPS.
+
+Analysis:
+- Batch 5 fits but is tight. Batch 6 fails at essentially full H200 memory, so
+  using 5 is a max-fit choice and 4 is safer against allocator fragmentation.
+- The step9000 videos still preserve scene/table/object layout better than
+  null rollouts, but the gripper/robot region blurs into a cloudy smear by
+  mid/late frames. This remains consistent with global latent loss being
+  dominated by static background and the action adapter not yet learning sharp
+  moving robot geometry.
+
+Next:
+- Commit/push the batch-size implementation and worklog.
+- Update the canonical Della checkout to the committed code.
+- Restart only the full-cache waiter with `DROID_BATCH_SIZE=5` before the
+  cache reaches `1,440,554/1,440,554`; leave active training job `9497852` and
+  cache submitter jobs untouched.
+- Continue monitoring current DROID training through step10000 and fetch/inspect
+  the final eval videos.

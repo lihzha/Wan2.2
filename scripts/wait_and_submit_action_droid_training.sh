@@ -13,6 +13,7 @@ TRAIN_MANIFEST_JSONL=${TRAIN_MANIFEST_JSONL:-runs/droid_window_plans/train_v0_33
 VAL_MANIFEST_JSONL=${VAL_MANIFEST_JSONL:-runs/droid_window_plans/val_v0_33f_stride4_cap20g_fp16_top50.jsonl}
 POLL_SECONDS=${POLL_SECONDS:-900}
 LOG_PATH=${LOG_PATH:-runs/droid_window_plans/action_droid_training_submitter.log}
+DROID_BATCH_SIZE=${DROID_BATCH_SIZE:-1}
 
 mkdir -p "$(dirname "${LOG_PATH}")"
 
@@ -75,7 +76,7 @@ fi
 
 expected_train=$(json_int "${TRAIN_SUMMARY}" selected_windows)
 expected_val=$(json_int "${VAL_SUMMARY}" selected_windows)
-log "waiting for cache train=${expected_train} val=${expected_val}"
+log "waiting for cache train=${expected_train} val=${expected_val} batch_size=${DROID_BATCH_SIZE}"
 
 while true; do
   train_count=$(count_dirs "${TRIPLETS_ROOT}" | tr -d ' ')
@@ -91,7 +92,7 @@ log "cache complete; submitting DROID training smoke"
 smoke_job=$(submit_sbatch \
   --time=00:30:00 \
   --job-name=act-droid-win-smoke \
-  --export=ALL,TRIPLETS_ROOT="${TRIPLETS_ROOT}",VAL_TRIPLETS_ROOT="${VAL_TRIPLETS_ROOT}",TRAIN_MANIFEST_JSONL="${TRAIN_MANIFEST_JSONL}",VAL_MANIFEST_JSONL="${VAL_MANIFEST_JSONL}",MODE=side_adapter,RUN_TAG=side_bn512h8_L0-29_fresh_25step_window_smoke,TOTAL_STEPS=5,SAMPLING_STEPS=25,SEED=0,NOISE_MODE=fresh,SIDE_ADAPTER_LAYERS=0-29,SIDE_ADAPTER_HIDDEN=512,SIDE_ADAPTER_HEADS=8,LR=5e-5,WARMUP_STEPS=5,LR_MIN_RATIO=0.1,MAX_TRAIN_SAMPLES=128,MAX_VAL_SAMPLES=4,VAL_INTERVAL=5,LOG_INTERVAL=1,CKPT_INTERVAL=5 \
+  --export=ALL,TRIPLETS_ROOT="${TRIPLETS_ROOT}",VAL_TRIPLETS_ROOT="${VAL_TRIPLETS_ROOT}",TRAIN_MANIFEST_JSONL="${TRAIN_MANIFEST_JSONL}",VAL_MANIFEST_JSONL="${VAL_MANIFEST_JSONL}",MODE=side_adapter,RUN_TAG=side_bn512h8_L0-29_fresh_25step_window_smoke_bs${DROID_BATCH_SIZE},TOTAL_STEPS=5,SAMPLING_STEPS=25,SEED=0,NOISE_MODE=fresh,BATCH_SIZE="${DROID_BATCH_SIZE}",SIDE_ADAPTER_LAYERS=0-29,SIDE_ADAPTER_HIDDEN=512,SIDE_ADAPTER_HEADS=8,LR=5e-5,WARMUP_STEPS=5,LR_MIN_RATIO=0.1,MAX_TRAIN_SAMPLES=128,MAX_VAL_SAMPLES=4,VAL_INTERVAL=5,LOG_INTERVAL=1,CKPT_INTERVAL=5 \
   run_action_conditioned_droid.sh)
 wait_for_job_clean "${smoke_job}"
 
@@ -99,6 +100,6 @@ log "smoke clean; submitting full DROID training"
 full_job=$(submit_sbatch \
   --time=36:00:00 \
   --job-name=act-droid-win-10k \
-  --export=ALL,TRIPLETS_ROOT="${TRIPLETS_ROOT}",VAL_TRIPLETS_ROOT="${VAL_TRIPLETS_ROOT}",TRAIN_MANIFEST_JSONL="${TRAIN_MANIFEST_JSONL}",VAL_MANIFEST_JSONL="${VAL_MANIFEST_JSONL}",MODE=side_adapter,RUN_TAG=side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5,TOTAL_STEPS=10000,SAMPLING_STEPS=25,SEED=0,NOISE_MODE=fresh,SIDE_ADAPTER_LAYERS=0-29,SIDE_ADAPTER_HIDDEN=512,SIDE_ADAPTER_HEADS=8,LR=5e-5,WARMUP_STEPS=500,LR_MIN_RATIO=0.1,MAX_TRAIN_SAMPLES=0,MAX_VAL_SAMPLES=32,VAL_INTERVAL=1000,LOG_INTERVAL=20,CKPT_INTERVAL=1000 \
+  --export=ALL,TRIPLETS_ROOT="${TRIPLETS_ROOT}",VAL_TRIPLETS_ROOT="${VAL_TRIPLETS_ROOT}",TRAIN_MANIFEST_JSONL="${TRAIN_MANIFEST_JSONL}",VAL_MANIFEST_JSONL="${VAL_MANIFEST_JSONL}",MODE=side_adapter,RUN_TAG=side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs${DROID_BATCH_SIZE},TOTAL_STEPS=10000,SAMPLING_STEPS=25,SEED=0,NOISE_MODE=fresh,BATCH_SIZE="${DROID_BATCH_SIZE}",SIDE_ADAPTER_LAYERS=0-29,SIDE_ADAPTER_HIDDEN=512,SIDE_ADAPTER_HEADS=8,LR=5e-5,WARMUP_STEPS=500,LR_MIN_RATIO=0.1,MAX_TRAIN_SAMPLES=0,MAX_VAL_SAMPLES=32,VAL_INTERVAL=1000,LOG_INTERVAL=20,CKPT_INTERVAL=1000 \
   run_action_conditioned_droid.sh)
 log "submitted full DROID training job ${full_job}"
