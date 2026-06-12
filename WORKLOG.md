@@ -3353,7 +3353,7 @@ Next:
   starts.
 - Continue monitoring single-GPU job `9541718`; next eval target is step `4000`.
 
-## 2026-06-11 20:26 PDT - Full-cache batch-5 step-4000 eval queued
+## 2026-06-11 20:26 PDT - Full-cache batch-5 step-4000 eval
 
 Goal:
 - Validate the fourth full-cache batch-size-5 checkpoint and keep the periodic
@@ -3385,7 +3385,7 @@ Command / Job:
 - 8-GPU full DDP job: `9565757`
 
 Result:
-- status: eval queued
+- status: passed
 - Training validation improved:
   - step 1000: `0.2770900116302073`
   - step 2000: `0.24543552426621318`
@@ -3393,8 +3393,19 @@ Result:
   - step 4000: `0.21933504613116384`
 - `ckpt_step4000.pt` timestamp:
   `2026-06-11 23:25:52 -0400`, size `958230026` bytes.
-- Eval job `9573559` is pending on priority with estimated start
-  `2026-06-12T00:01:31` Della time.
+- `sacct -j 9573559` reports `COMPLETED 0:0`, elapsed `00:02:23`.
+- Eval videos validate at 320x192, 33 frames, 16 FPS.
+- step-4000 eval metrics:
+  - seed1000 latent MSE `0.24452289938926697` vs null
+    `1.9798624515533447`.
+  - seed1001 latent MSE `0.24768376350402832` vs null
+    `4.661829471588135`.
+- local videos:
+  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step4000_ep399_v0_s00004_s1000_1001/`
+- contact sheet:
+  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step4000_ep399_v0_s00004_s1000_1001/droid_full_bs5_step4000_eval_contact_sheet.jpg`
+- viz URL:
+  `http://localhost:8765/view?path=Wan2.2/_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step4000_ep399_v0_s00004_s1000_1001`
 - Current DROID training error scan is clean for OOM, traceback, NaN,
   RuntimeError, and CUDA errors.
 - Full 8-GPU job `9565757` remains pending on priority; latest estimate
@@ -3404,13 +3415,16 @@ Analysis:
 - The metric trend is healthy through step `4000`; the validation drop from
   `0.2399568` to `0.2193350` is the strongest interval improvement in this
   batch-5 run so far.
+- Fixed held-out random-noise eval also improved versus step `3000`
+  (`0.2574 -> 0.2445` on seed1000 and `0.2635 -> 0.2477` on seed1001).
+- Qualitatively, samples remain far better than the null baselines and preserve
+  the table/object layout, but the moving robot/gripper area still turns into a
+  gray smeared cloud by the middle/end frames.
 - Step `3980` showed a large grad-norm spike (`857.10`), but step `4000`
   returned to `4.03`, no error signatures appeared, and validation improved,
   so this currently looks like an outlier batch rather than instability.
 
 Next:
-- Monitor eval job `9573559`; fetch videos locally, validate video metadata,
-  inspect a contact sheet, and record metrics/artifacts when it completes.
 - Keep monitoring single-GPU training job `9541718`; next eval target is step
   `5000`.
 - Keep monitoring 8-GPU DDP job `9565757`; inspect launch logs immediately

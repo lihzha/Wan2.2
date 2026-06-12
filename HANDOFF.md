@@ -1,6 +1,6 @@
 # Wan2.2 Della Handoff
 
-Last updated: 2026-06-11 20:26 PDT.
+Last updated: 2026-06-11 21:06 PDT.
 
 This is the short handoff for the next agent. The full chronological record is
 in `WORKLOG.md`.
@@ -52,10 +52,15 @@ direction is scaling side-adapter training with fresh noise.
   `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5`.
 - Step-4000 validation landed and improved to `0.21933504613116384`.
   `ckpt_latest.pt` was copied to `ckpt_step4000.pt`.
-- Step-4000 eval job `9573559` was submitted with output dir:
+- Step-4000 eval job `9573559` completed cleanly (`COMPLETED 0:0`, elapsed
+  `00:02:23`) with output dir:
   `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step4000_ep399_v0_s00004_s1000_1001/`.
-  It is pending on priority with estimated start
-  `2026-06-12T00:01:31` Della time.
+  Local artifacts:
+  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step4000_ep399_v0_s00004_s1000_1001/`.
+  Viz URL:
+  `http://localhost:8765/view?path=Wan2.2/_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step4000_ep399_v0_s00004_s1000_1001`.
+  Contact sheet:
+  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step4000_ep399_v0_s00004_s1000_1001/droid_full_bs5_step4000_eval_contact_sheet.jpg`.
 - Previous full-cache evals:
   - step 1000: seed1000 MSE `0.29633891582489014`, seed1001 MSE
     `0.2788466513156891`.
@@ -63,6 +68,8 @@ direction is scaling side-adapter training with fresh noise.
     `0.2750750482082367`.
   - step 3000: seed1000 MSE `0.2574395537376404`, seed1001 MSE
     `0.26347997784614563`.
+  - step 4000: seed1000 MSE `0.24452289938926697`, seed1001 MSE
+    `0.24768376350402832`.
   Qualitatively, the scene remains much better than null, but the moving
   robot/gripper still turns gray/hazy/smeared after motion starts.
 - Full 8-GPU DDP job `9565757` is dependency-released and pending on priority
