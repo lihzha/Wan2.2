@@ -3293,3 +3293,62 @@ Next:
 - Continue monitoring `9541718`; next eval target is step `4000`.
 - Continue monitoring DDP 8-GPU smoke `9565756` and dependent full run
   `9565757`.
+
+## 2026-06-11 17:25 PDT - 8-GPU DDP smoke passed
+
+Goal:
+- Validate the barrier-fix DDP trainer on all 8 GPUs before the full 8-GPU
+  training job starts.
+
+Hypothesis:
+- The barrier-fix commit should remove the NCCL ambiguous-device barrier
+  warning seen in the 2-GPU smoke while preserving functional DDP training.
+
+Change:
+- No source change. Fetched 8-GPU smoke logs and small run metadata locally.
+
+Version Control:
+- launch_commit: `7cb94a9671926d12f20b253d64ad37152795f577`
+- local record branch: `codex/droid-ddp-8gpu`
+- changed_files:
+  - `WORKLOG.md`
+  - `HANDOFF.md`
+
+Command / Job:
+- 8-GPU smoke job: `9565756`
+- run dir:
+  `/scratch/gpfs/AM43/lz3952/worktrees/Wan2.2/codex-droid-ddp-8gpu-barrierfix/runs/action_droid_dist_ddp8_smoke_7cb94a9`
+- local fetched artifacts:
+  - `_cluster/action_droid_dist_ddp8_smoke_7cb94a9/`
+  - `_cluster/slurm_outputs/action-droid-dist/out_act-ddp8-smoke_9565756.log`
+  - `_cluster/slurm_outputs/action-droid-dist/err_act-ddp8-smoke_9565756.log`
+- dependent full 8-GPU job: `9565757`
+
+Result:
+- status: passed
+- Smoke output reports `distributed=True`, `world_size=8`, local batch `1`,
+  global batch `8`.
+- Completed one optimizer step:
+  loss `0.267435759305954`, grad norm `92.42627716064453`, lr `1e-7`.
+- Rank-0 validation/checkpointing completed:
+  val loss `1.5293481349945068`.
+- `ckpt_latest.pt`, `ckpt_best_val.pt`, `config.json`, `summary.json`,
+  `train_log.csv`, and `val_log.csv` were written.
+- `9565757` dependency was released and is now pending with reason `(None)`;
+  estimated start was `2026-06-12T06:31:24` at the latest check.
+- `sacct` still showed a stale parent `PENDING` row for `9565756`, but the
+  logs, output files, and released dependency all indicate successful
+  completion.
+
+Analysis:
+- The NCCL barrier warning is gone after passing rank-local barrier
+  `device_ids`.
+- The remaining DDP grad-stride warning is performance-only and did not prevent
+  a clean 8-rank optimizer step; it can be optimized later if step throughput
+  is poor.
+- Full 8-GPU training is now safely dependency-released.
+
+Next:
+- Monitor full 8-GPU job `9565757`; inspect launch logs immediately when it
+  starts.
+- Continue monitoring single-GPU job `9541718`; next eval target is step `4000`.

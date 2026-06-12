@@ -71,7 +71,11 @@ sample set did not reveal an obvious easy low-rank structure. The practical
   `/scratch/gpfs/AM43/lz3952/worktrees/Wan2.2/codex-droid-ddp-8gpu-barrierfix`
   at `7cb94a9671926d12f20b253d64ad37152795f577`.
   Replacement jobs: `9565756` `act-ddp8-smoke` ->
-  `9565757` `act-ddp8-10k`.
+  `9565757` `act-ddp8-10k`. The 8-GPU smoke completed functionally:
+  world size `8`, one optimizer step, val/checkpoint writes, no NCCL barrier
+  warning after the barrier fix. The remaining grad-stride warning is
+  performance-only. Full job `9565757` is dependency-released and pending with
+  reason `(None)`; latest estimated start was `2026-06-12T06:31:24`.
   The full 8-GPU run uses local batch `5`, global batch `40`, LR `5e-5`,
   10k optimizer steps, 25 diffusion steps, and full train/val manifests.
   Dependent jobs must be canceled/replaced if a smoke fails.
