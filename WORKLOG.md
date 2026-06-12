@@ -3660,3 +3660,87 @@ Next:
   `8000` if the job reaches it before wall time.
 - Keep monitoring 8-GPU DDP job `9565757`; inspect launch logs immediately
   when it starts.
+
+## 2026-06-12 11:42 PDT - Full-cache batch-5 step-8000 eval
+
+Goal:
+- Validate the eighth full-cache batch-size-5 checkpoint after the step-8000
+  validation loss regressed relative to step `7000`.
+
+Hypothesis:
+- If the validation-loss bump is a noisy batch/checkpoint effect, fixed
+  random-noise eval and visual quality may stay flat or improve versus step
+  `7000`; if it reflects over-training/instability, fixed eval and visual
+  motion quality should worsen.
+
+Change:
+- No source change. Waited for step-8000 validation/checkpoint completion,
+  copied `ckpt_latest.pt` to `ckpt_step8000.pt`, and submitted the fixed
+  seed1000/seed1001 eval.
+
+Version Control:
+- branch: `codex/droid-ddp-8gpu`
+- implementation_commit: `n/a` for eval; single-GPU training source remains
+  the canonical Della checkout used by job `9541718`.
+- changed_files:
+  - `WORKLOG.md`
+  - `HANDOFF.md`
+
+Command / Job:
+- active training job: `9541718`
+- eval job: `9593864`
+- checkpoint:
+  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/ckpt_step8000.pt`
+- remote videos:
+  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step8000_ep399_v0_s00004_s1000_1001/`
+- 8-GPU full DDP job: `9565757`
+
+Result:
+- status: passed
+- Training validation:
+  - step 1000: `0.2770900116302073`
+  - step 2000: `0.24543552426621318`
+  - step 3000: `0.23995679058134556`
+  - step 4000: `0.21933504613116384`
+  - step 5000: `0.21644743299111724`
+  - step 6000: `0.20909928111359477`
+  - step 7000: `0.2057622061111033`
+  - step 8000: `0.21598921343684196`
+- `ckpt_step8000.pt` timestamp:
+  `2026-06-12 14:38:09 -0400`, size `958230026` bytes.
+- `sacct -j 9593864` reports `COMPLETED 0:0`, elapsed `00:02:16`.
+- Eval videos validate at 320x192, 33 frames, 16 FPS.
+- step-8000 eval metrics:
+  - seed1000 latent MSE `0.22435477375984192` vs null
+    `1.9798624515533447`.
+  - seed1001 latent MSE `0.23000946640968323` vs null
+    `4.661829471588135`.
+- local videos:
+  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step8000_ep399_v0_s00004_s1000_1001/`
+- contact sheet:
+  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step8000_ep399_v0_s00004_s1000_1001/droid_full_bs5_step8000_eval_contact_sheet.jpg`
+- viz URL:
+  `http://localhost:8765/view?path=Wan2.2/_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step8000_ep399_v0_s00004_s1000_1001`
+- Single-GPU training job `9541718` remains running; latest inspected CSV line
+  is step `8020`.
+- Full 8-GPU job `9565757` remains pending; latest observed reason is
+  `Priority`.
+
+Analysis:
+- The validation loss regressed at step `8000`
+  (`0.2057622 -> 0.2159892`), but the fixed held-out eval improved versus
+  step `7000`: seed1000 `0.2264507 -> 0.2243548`, seed1001
+  `0.2331607 -> 0.2300095`.
+- Visual inspection is broadly flat to slightly better versus step `7000`.
+  The samples remain far better than null, seed1000 is still cleaner, and
+  seed1001 still shows gray haze/softening around the moving gripper/object
+  area. The step-8000 validation bump does not show up as an obvious visual
+  collapse on this fixed eval.
+- This suggests the fixed held-out sample is still improving slowly, but the
+  broader validation subset may be noisy or beginning to flatten/regress.
+
+Next:
+- Keep monitoring single-GPU training job `9541718`; next eval target is step
+  `9000` if the job reaches it before wall time.
+- Keep monitoring 8-GPU DDP job `9565757`; inspect launch logs immediately
+  when it starts.
