@@ -1,6 +1,6 @@
 # Wan2.2 Della Handoff
 
-Last updated: 2026-06-12 11:42 PDT.
+Last updated: 2026-06-12 15:32 PDT.
 
 This is the short handoff for the next agent. The full chronological record is
 in `WORKLOG.md`.
@@ -44,14 +44,15 @@ Key conclusion so far: learning/predicting `z_init` directly from a large DDIM
 sample set did not reveal an obvious easy low-rank structure. The practical
 direction is scaling side-adapter training with fresh noise.
 
-## Current Status - 2026-06-12 11:42 PDT
+## Current Status - 2026-06-12 15:32 PDT
 
 - Active single-GPU full-cache batch-5 job `9541718` is still running on
   `della-i21g3` from the canonical Della checkout. Run dir:
   `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5`.
-- Latest inspected training CSV line is step `8020`; validation regressed to
-  `0.21598921343684196` at step `8000` after improving to
-  `0.2057622061111033` at step `7000`.
+- Latest inspected training CSV line is step `9020`; validation improved to a
+  new best `0.20228713611140847` at step `9000`. The job wall-time ends at
+  `2026-06-12T19:58:30` Della time, so step `10000` is unlikely before this
+  single-GPU job exits.
 - Validation trend:
   - step 1000: `0.2770900116302073`
   - step 2000: `0.24543552426621318`
@@ -61,15 +62,16 @@ direction is scaling side-adapter training with fresh noise.
   - step 6000: `0.20909928111359477`
   - step 7000: `0.2057622061111033`
   - step 8000: `0.21598921343684196`
-- Step-8000 eval job `9593864` completed cleanly (`COMPLETED 0:0`, elapsed
-  `00:02:16`) with output dir:
-  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step8000_ep399_v0_s00004_s1000_1001/`.
+  - step 9000: `0.20228713611140847`
+- Step-9000 eval job `9601165` completed cleanly (`COMPLETED 0:0`, elapsed
+  `00:03:17`) with output dir:
+  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step9000_ep399_v0_s00004_s1000_1001/`.
   Local artifacts:
-  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step8000_ep399_v0_s00004_s1000_1001/`.
+  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step9000_ep399_v0_s00004_s1000_1001/`.
   Viz URL:
-  `http://localhost:8765/view?path=Wan2.2/_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step8000_ep399_v0_s00004_s1000_1001`.
+  `http://localhost:8765/view?path=Wan2.2/_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step9000_ep399_v0_s00004_s1000_1001`.
   Contact sheet:
-  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step8000_ep399_v0_s00004_s1000_1001/droid_full_bs5_step8000_eval_contact_sheet.jpg`.
+  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step9000_ep399_v0_s00004_s1000_1001/droid_full_bs5_step9000_eval_contact_sheet.jpg`.
 - Previous full-cache evals:
   - step 1000: seed1000 MSE `0.29633891582489014`, seed1001 MSE
     `0.2788466513156891`.
@@ -87,12 +89,14 @@ direction is scaling side-adapter training with fresh noise.
     `0.23316074907779694`.
   - step 8000: seed1000 MSE `0.22435477375984192`, seed1001 MSE
     `0.23000946640968323`.
+  - step 9000: seed1000 MSE `0.2113063931465149`, seed1001 MSE
+    `0.2144833654165268`.
   Qualitatively, the scene remains much better than null, but the moving
-  robot/gripper still turns gray/hazy/smeared after motion starts. Step `8000`
-  is broadly flat to slightly better than step `7000` on the fixed eval:
-  seed1000 remains cleaner, and seed1001 still has visible haze/softening
-  around the moving gripper/object interaction region. The step-8000 validation
-  bump did not show up as a visual collapse on the fixed eval.
+  robot/gripper still turns gray/hazy/smeared after motion starts. Step `9000`
+  is the best fixed eval numerically and is stable-to-slightly-improved
+  visually versus step `8000`, but it is not a dramatic perceptual jump;
+  seed1001 still has visible haze/softening around the moving gripper/object
+  interaction region.
 - Step-5000 eval job `9579605` completed cleanly (`COMPLETED 0:0`, elapsed
   `00:02:17`). Local artifacts:
   `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step5000_ep399_v0_s00004_s1000_1001/`.
@@ -104,7 +108,7 @@ direction is scaling side-adapter training with fresh noise.
   from isolated Della worktree
   `/scratch/gpfs/AM43/lz3952/worktrees/Wan2.2/codex-droid-ddp-8gpu-barrierfix`.
   Latest observed reason is `Priority`; latest checked start estimate slipped
-  to `2026-06-12T19:39:00` Della time. Run dir:
+  to `2026-06-12T22:00:00` Della time. Run dir:
   `runs/action_droid_dist_side_bn512h8_L0-29_fresh_25step_fullcache_10k_lr5e-5_bs5x8_ddp_7cb94a9`.
 - The 8-GPU smoke job `9565756` passed: world size `8`, one optimizer step,
   validation/checkpoint writes, and no NCCL ambiguous-device barrier warning.
