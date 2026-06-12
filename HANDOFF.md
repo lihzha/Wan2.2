@@ -1,6 +1,6 @@
 # Wan2.2 Della Handoff
 
-Last updated: 2026-06-11 21:06 PDT.
+Last updated: 2026-06-12 00:20 PDT.
 
 This is the short handoff for the next agent. The full chronological record is
 in `WORKLOG.md`.
@@ -70,13 +70,22 @@ direction is scaling side-adapter training with fresh noise.
     `0.26347997784614563`.
   - step 4000: seed1000 MSE `0.24452289938926697`, seed1001 MSE
     `0.24768376350402832`.
+  - step 5000: seed1000 MSE `0.23440805077552795`, seed1001 MSE
+    `0.23428887128829956`.
   Qualitatively, the scene remains much better than null, but the moving
   robot/gripper still turns gray/hazy/smeared after motion starts.
+- Step-5000 eval job `9579605` completed cleanly (`COMPLETED 0:0`, elapsed
+  `00:02:17`). Local artifacts:
+  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step5000_ep399_v0_s00004_s1000_1001/`.
+  Viz URL:
+  `http://localhost:8765/view?path=Wan2.2/_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step5000_ep399_v0_s00004_s1000_1001`.
+  Contact sheet:
+  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step5000_ep399_v0_s00004_s1000_1001/droid_full_bs5_step5000_eval_contact_sheet.jpg`.
 - Full 8-GPU DDP job `9565757` is dependency-released and pending on priority
   from isolated Della worktree
   `/scratch/gpfs/AM43/lz3952/worktrees/Wan2.2/codex-droid-ddp-8gpu-barrierfix`.
-  Latest start estimate is `2026-06-12T09:58:21` Della time with a 2-day time
-  limit. Run dir:
+  Latest start estimate is `2026-06-12T14:49:54` Della time on
+  `della-i20g2` with a 2-day time limit. Run dir:
   `runs/action_droid_dist_side_bn512h8_L0-29_fresh_25step_fullcache_10k_lr5e-5_bs5x8_ddp_7cb94a9`.
 - The 8-GPU smoke job `9565756` passed: world size `8`, one optimizer step,
   validation/checkpoint writes, and no NCCL ambiguous-device barrier warning.
