@@ -1,6 +1,6 @@
 # Wan2.2 Della Handoff
 
-Last updated: 2026-06-11 15:15 PDT.
+Last updated: 2026-06-11 20:26 PDT.
 
 This is the short handoff for the next agent. The full chronological record is
 in `WORKLOG.md`.
@@ -43,6 +43,39 @@ The current best direction is the side adapter:
 
 Key conclusion so far: learning/predicting `z_init` directly from a large DDIM
 sample set did not reveal an obvious easy low-rank structure. The practical
+direction is scaling side-adapter training with fresh noise.
+
+## Current Status - 2026-06-11 20:26 PDT
+
+- Active single-GPU full-cache batch-5 job `9541718` is still running on
+  `della-i21g3` from the canonical Della checkout. Run dir:
+  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5`.
+- Step-4000 validation landed and improved to `0.21933504613116384`.
+  `ckpt_latest.pt` was copied to `ckpt_step4000.pt`.
+- Step-4000 eval job `9573559` was submitted with output dir:
+  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step4000_ep399_v0_s00004_s1000_1001/`.
+  It is pending on priority with estimated start
+  `2026-06-12T00:01:31` Della time.
+- Previous full-cache evals:
+  - step 1000: seed1000 MSE `0.29633891582489014`, seed1001 MSE
+    `0.2788466513156891`.
+  - step 2000: seed1000 MSE `0.27191445231437683`, seed1001 MSE
+    `0.2750750482082367`.
+  - step 3000: seed1000 MSE `0.2574395537376404`, seed1001 MSE
+    `0.26347997784614563`.
+  Qualitatively, the scene remains much better than null, but the moving
+  robot/gripper still turns gray/hazy/smeared after motion starts.
+- Full 8-GPU DDP job `9565757` is dependency-released and pending on priority
+  from isolated Della worktree
+  `/scratch/gpfs/AM43/lz3952/worktrees/Wan2.2/codex-droid-ddp-8gpu-barrierfix`.
+  Latest start estimate is `2026-06-12T09:58:21` Della time with a 2-day time
+  limit. Run dir:
+  `runs/action_droid_dist_side_bn512h8_L0-29_fresh_25step_fullcache_10k_lr5e-5_bs5x8_ddp_7cb94a9`.
+- The 8-GPU smoke job `9565756` passed: world size `8`, one optimizer step,
+  validation/checkpoint writes, and no NCCL ambiguous-device barrier warning.
+- Do not send a final answer while `9541718`, `9573559`, or `9565757` still
+  need active monitoring, artifact inspection, or relaunch/debug handling.
+
 ## Current Status - 2026-06-11 05:35 PDT
 
 - A DDP implementation is in progress on branch `codex/droid-ddp-8gpu`.

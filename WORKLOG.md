@@ -3352,3 +3352,66 @@ Next:
 - Monitor full 8-GPU job `9565757`; inspect launch logs immediately when it
   starts.
 - Continue monitoring single-GPU job `9541718`; next eval target is step `4000`.
+
+## 2026-06-11 20:26 PDT - Full-cache batch-5 step-4000 eval queued
+
+Goal:
+- Validate the fourth full-cache batch-size-5 checkpoint and keep the periodic
+  eval cadence active while the full 8-GPU DDP run waits in queue.
+
+Hypothesis:
+- If the larger full-cache run continues learning, step `4000` validation and
+  held-out fixed random-noise eval should improve versus step `3000`.
+
+Change:
+- No source change. Copied `ckpt_latest.pt` to `ckpt_step4000.pt` after the
+  step-4000 checkpoint timestamp advanced.
+
+Version Control:
+- branch: `codex/droid-ddp-8gpu`
+- implementation_commit: `n/a` for eval; single-GPU training source remains
+  the canonical Della checkout used by job `9541718`.
+- changed_files:
+  - `WORKLOG.md`
+  - `HANDOFF.md`
+
+Command / Job:
+- active training job: `9541718`
+- eval job: `9573559`
+- checkpoint:
+  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/ckpt_step4000.pt`
+- remote videos:
+  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step4000_ep399_v0_s00004_s1000_1001/`
+- 8-GPU full DDP job: `9565757`
+
+Result:
+- status: eval queued
+- Training validation improved:
+  - step 1000: `0.2770900116302073`
+  - step 2000: `0.24543552426621318`
+  - step 3000: `0.23995679058134556`
+  - step 4000: `0.21933504613116384`
+- `ckpt_step4000.pt` timestamp:
+  `2026-06-11 23:25:52 -0400`, size `958230026` bytes.
+- Eval job `9573559` is pending on priority with estimated start
+  `2026-06-12T00:01:31` Della time.
+- Current DROID training error scan is clean for OOM, traceback, NaN,
+  RuntimeError, and CUDA errors.
+- Full 8-GPU job `9565757` remains pending on priority; latest estimate
+  `2026-06-12T09:58:21` Della time with a 2-day time limit.
+
+Analysis:
+- The metric trend is healthy through step `4000`; the validation drop from
+  `0.2399568` to `0.2193350` is the strongest interval improvement in this
+  batch-5 run so far.
+- Step `3980` showed a large grad-norm spike (`857.10`), but step `4000`
+  returned to `4.03`, no error signatures appeared, and validation improved,
+  so this currently looks like an outlier batch rather than instability.
+
+Next:
+- Monitor eval job `9573559`; fetch videos locally, validate video metadata,
+  inspect a contact sheet, and record metrics/artifacts when it completes.
+- Keep monitoring single-GPU training job `9541718`; next eval target is step
+  `5000`.
+- Keep monitoring 8-GPU DDP job `9565757`; inspect launch logs immediately
+  when it starts.
