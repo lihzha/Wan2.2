@@ -1,6 +1,6 @@
 # Wan2.2 Della Handoff
 
-Last updated: 2026-06-12 04:07 PDT.
+Last updated: 2026-06-12 07:52 PDT.
 
 This is the short handoff for the next agent. The full chronological record is
 in `WORKLOG.md`.
@@ -44,13 +44,13 @@ Key conclusion so far: learning/predicting `z_init` directly from a large DDIM
 sample set did not reveal an obvious easy low-rank structure. The practical
 direction is scaling side-adapter training with fresh noise.
 
-## Current Status - 2026-06-12 04:07 PDT
+## Current Status - 2026-06-12 07:52 PDT
 
 - Active single-GPU full-cache batch-5 job `9541718` is still running on
   `della-i21g3` from the canonical Della checkout. Run dir:
   `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5`.
-- Latest inspected training log line is step `6000`; validation improved to
-  `0.20909928111359477`.
+- Latest inspected training CSV line is step `7020`; validation improved to
+  `0.2057622061111033` at step `7000`.
 - Validation trend:
   - step 1000: `0.2770900116302073`
   - step 2000: `0.24543552426621318`
@@ -58,14 +58,16 @@ direction is scaling side-adapter training with fresh noise.
   - step 4000: `0.21933504613116384`
   - step 5000: `0.21644743299111724`
   - step 6000: `0.20909928111359477`
-- Step-6000 eval job `9582155` completed cleanly with output dir:
-  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step6000_ep399_v0_s00004_s1000_1001/`.
+  - step 7000: `0.2057622061111033`
+- Step-7000 eval job `9586564` completed cleanly (`COMPLETED 0:0`, elapsed
+  `00:02:25`) with output dir:
+  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step7000_ep399_v0_s00004_s1000_1001/`.
   Local artifacts:
-  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step6000_ep399_v0_s00004_s1000_1001/`.
+  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step7000_ep399_v0_s00004_s1000_1001/`.
   Viz URL:
-  `http://localhost:8765/view?path=Wan2.2/_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step6000_ep399_v0_s00004_s1000_1001`.
+  `http://localhost:8765/view?path=Wan2.2/_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step7000_ep399_v0_s00004_s1000_1001`.
   Contact sheet:
-  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step6000_ep399_v0_s00004_s1000_1001/droid_full_bs5_step6000_eval_contact_sheet.jpg`.
+  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step7000_ep399_v0_s00004_s1000_1001/droid_full_bs5_step7000_eval_contact_sheet.jpg`.
 - Previous full-cache evals:
   - step 1000: seed1000 MSE `0.29633891582489014`, seed1001 MSE
     `0.2788466513156891`.
@@ -79,11 +81,13 @@ direction is scaling side-adapter training with fresh noise.
     `0.23428887128829956`.
   - step 6000: seed1000 MSE `0.23397839069366455`, seed1001 MSE
     `0.23458802700042725`.
+  - step 7000: seed1000 MSE `0.22645071148872375`, seed1001 MSE
+    `0.23316074907779694`.
   Qualitatively, the scene remains much better than null, but the moving
-  robot/gripper still turns gray/hazy/smeared after motion starts. Step `6000`
-  improved validation but fixed held-out MSE is essentially flat versus step
-  `5000`, so more single-GPU steps at this setting are not clearly fixing the
-  motion-region blur.
+  robot/gripper still turns gray/hazy/smeared after motion starts. Step `7000`
+  is a real qualitative improvement over step `6000`, especially for seed1000,
+  but seed1001 still has visible haze/softening around the moving
+  gripper/object interaction region.
 - Step-5000 eval job `9579605` completed cleanly (`COMPLETED 0:0`, elapsed
   `00:02:17`). Local artifacts:
   `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step5000_ep399_v0_s00004_s1000_1001/`.
@@ -94,8 +98,8 @@ direction is scaling side-adapter training with fresh noise.
 - Full 8-GPU DDP job `9565757` is dependency-released and pending on priority
   from isolated Della worktree
   `/scratch/gpfs/AM43/lz3952/worktrees/Wan2.2/codex-droid-ddp-8gpu-barrierfix`.
-  Latest start estimate is `2026-06-12T16:51:21` Della time on
-  `della-i24g2` with a 2-day time limit. Run dir:
+  Latest observed reason is `QOSGrpGRES`; earlier start estimate was
+  `2026-06-12T16:51:21` Della time. Run dir:
   `runs/action_droid_dist_side_bn512h8_L0-29_fresh_25step_fullcache_10k_lr5e-5_bs5x8_ddp_7cb94a9`.
 - The 8-GPU smoke job `9565756` passed: world size `8`, one optimizer step,
   validation/checkpoint writes, and no NCCL ambiguous-device barrier warning.

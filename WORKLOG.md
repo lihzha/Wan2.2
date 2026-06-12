@@ -3578,3 +3578,85 @@ Next:
   `7000` if the job reaches it before wall time.
 - Keep monitoring 8-GPU DDP job `9565757`; inspect launch logs immediately
   when it starts.
+
+## 2026-06-12 07:52 PDT - Full-cache batch-5 step-7000 eval
+
+Goal:
+- Validate the seventh full-cache batch-size-5 checkpoint and compare whether
+  the qualitative robot/gripper blur starts improving beyond the step-6000
+  plateau.
+
+Hypothesis:
+- If continued training is still useful, validation should improve and the
+  fixed random-noise eval should either improve or show a visible reduction in
+  the motion-region gray cloud.
+
+Change:
+- No source change. Waited for step-7000 validation/checkpoint completion,
+  copied `ckpt_latest.pt` to `ckpt_step7000.pt`, and submitted a fixed
+  seed1000/seed1001 eval.
+
+Version Control:
+- branch: `codex/droid-ddp-8gpu`
+- implementation_commit: `n/a` for eval; single-GPU training source remains
+  the canonical Della checkout used by job `9541718`.
+- changed_files:
+  - `WORKLOG.md`
+  - `HANDOFF.md`
+
+Command / Job:
+- active training job: `9541718`
+- eval job: `9586564`
+- checkpoint:
+  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/ckpt_step7000.pt`
+- remote videos:
+  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step7000_ep399_v0_s00004_s1000_1001/`
+- 8-GPU full DDP job: `9565757`
+
+Result:
+- status: passed
+- Training validation:
+  - step 1000: `0.2770900116302073`
+  - step 2000: `0.24543552426621318`
+  - step 3000: `0.23995679058134556`
+  - step 4000: `0.21933504613116384`
+  - step 5000: `0.21644743299111724`
+  - step 6000: `0.20909928111359477`
+  - step 7000: `0.2057622061111033`
+- `ckpt_step7000.pt` timestamp:
+  `2026-06-12 10:48:14 -0400`, size `958230026` bytes.
+- `sacct -j 9586564` reports `COMPLETED 0:0`, elapsed `00:02:25`.
+- Eval videos validate at 320x192, 33 frames, 16 FPS.
+- step-7000 eval metrics:
+  - seed1000 latent MSE `0.22645071148872375` vs null
+    `1.9798624515533447`.
+  - seed1001 latent MSE `0.23316074907779694` vs null
+    `4.661829471588135`.
+- local videos:
+  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step7000_ep399_v0_s00004_s1000_1001/`
+- contact sheet:
+  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step7000_ep399_v0_s00004_s1000_1001/droid_full_bs5_step7000_eval_contact_sheet.jpg`
+- viz URL:
+  `http://localhost:8765/view?path=Wan2.2/_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step7000_ep399_v0_s00004_s1000_1001`
+- Single-GPU training job `9541718` remains running; latest inspected CSV line
+  is step `7020`.
+- Full 8-GPU job `9565757` remains pending; latest observed reason is
+  `QOSGrpGRES`.
+
+Analysis:
+- Validation improved again from step `6000` to `7000`
+  (`0.2090993 -> 0.2057622`), but the interval improvement is smaller than the
+  earlier large drops.
+- Fixed held-out eval improved versus step `6000`: seed1000
+  `0.2339784 -> 0.2264507`, seed1001 `0.2345880 -> 0.2331607`.
+- Visual inspection shows a real qualitative improvement versus step `6000`:
+  the large gray robot-motion cloud is reduced, especially for seed1000.
+  The failure mode is not solved; seed1001 still has visible haze/softening
+  around the moving gripper/object interaction region, and both samples remain
+  less crisp than the ground truth.
+
+Next:
+- Keep monitoring single-GPU training job `9541718`; next eval target is step
+  `8000` if the job reaches it before wall time.
+- Keep monitoring 8-GPU DDP job `9565757`; inspect launch logs immediately
+  when it starts.
