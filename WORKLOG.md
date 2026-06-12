@@ -3501,3 +3501,80 @@ Next:
   `6000`.
 - Keep monitoring 8-GPU DDP job `9565757`; inspect launch logs immediately
   when it starts.
+
+## 2026-06-12 04:07 PDT - Full-cache batch-5 step-6000 eval
+
+Goal:
+- Validate the sixth full-cache batch-size-5 checkpoint and keep the periodic
+  eval cadence active while the full 8-GPU DDP job remains queued.
+
+Hypothesis:
+- If training continues improving, validation should improve versus step
+  `5000`; the fixed held-out eval may start flattening if the model has
+  learned scene layout but not the high-frequency robot/gripper motion.
+
+Change:
+- No source change. Copied `ckpt_latest.pt` to `ckpt_step6000.pt` after the
+  step-6000 checkpoint timestamp advanced.
+
+Version Control:
+- branch: `codex/droid-ddp-8gpu`
+- implementation_commit: `n/a` for eval; single-GPU training source remains
+  the canonical Della checkout used by job `9541718`.
+- changed_files:
+  - `WORKLOG.md`
+  - `HANDOFF.md`
+
+Command / Job:
+- active training job: `9541718`
+- eval job: `9582155`
+- checkpoint:
+  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/ckpt_step6000.pt`
+- remote videos:
+  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step6000_ep399_v0_s00004_s1000_1001/`
+- 8-GPU full DDP job: `9565757`
+
+Result:
+- status: passed
+- Training validation:
+  - step 1000: `0.2770900116302073`
+  - step 2000: `0.24543552426621318`
+  - step 3000: `0.23995679058134556`
+  - step 4000: `0.21933504613116384`
+  - step 5000: `0.21644743299111724`
+  - step 6000: `0.20909928111359477`
+- `sacct -j 9582155` reported clean completion; local logs were fetched from
+  `slurm_outputs/action-droid/out_act-droid-win-eval-s6000_9582155.log` and
+  `slurm_outputs/action-droid/err_act-droid-win-eval-s6000_9582155.log`.
+- Eval videos validate at 320x192, 33 frames, 16 FPS.
+- step-6000 eval metrics:
+  - seed1000 latent MSE `0.23397839069366455` vs null
+    `1.9798624515533447`.
+  - seed1001 latent MSE `0.23458802700042725` vs null
+    `4.661829471588135`.
+- local videos:
+  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step6000_ep399_v0_s00004_s1000_1001/`
+- contact sheet:
+  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step6000_ep399_v0_s00004_s1000_1001/droid_full_bs5_step6000_eval_contact_sheet.jpg`
+- viz URL:
+  `http://localhost:8765/view?path=Wan2.2/_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step6000_ep399_v0_s00004_s1000_1001`
+- Full 8-GPU job `9565757` remains pending on priority; latest estimate
+  `2026-06-12T16:51:21` Della time on `della-i24g2`.
+- Single-GPU training job `9541718` remains running on `della-i21g3`; latest
+  inspected log line is step `6000`.
+
+Analysis:
+- Validation still improved from step `5000` to `6000`
+  (`0.2164474 -> 0.2090993`), so the training loss signal has not stalled.
+- Fixed held-out eval MSE is essentially flat versus step `5000`
+  (`0.2344 -> 0.2340` on seed1000 and `0.2343 -> 0.2346` on seed1001).
+- Visual inspection matches the metric flattening: samples remain much better
+  than null and keep the table/object layout, but the robot/gripper/motion
+  region still becomes a gray smeared cloud by the middle/end frames. More
+  single-GPU steps at this setting are not obviously fixing that failure mode.
+
+Next:
+- Keep monitoring single-GPU training job `9541718`; next eval target is step
+  `7000` if the job reaches it before wall time.
+- Keep monitoring 8-GPU DDP job `9565757`; inspect launch logs immediately
+  when it starts.

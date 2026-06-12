@@ -1,13 +1,13 @@
 # Wan2.2 Della Handoff
 
-Last updated: 2026-06-12 00:20 PDT.
+Last updated: 2026-06-12 04:07 PDT.
 
 This is the short handoff for the next agent. The full chronological record is
 in `WORKLOG.md`.
 
 ## Repository And Cluster
 
-- Local repo: `/Users/lzha/code/Wan2.2`
+- Local repo: `/home/lzha/code/Wan2.2`
 - Della repo: `/scratch/gpfs/AM43/lz3952/Wan2.2`
 - Canonical branch: `main`
 - Active implementation branch: `codex/droid-ddp-8gpu`
@@ -27,9 +27,8 @@ large artifacts.
 
 Important SSH note: use normal `ssh della-gpu`. Do not force
 `BatchMode=yes`; that caused false auth failures because the working config uses
-keyboard-interactive auth and ControlMaster. At this handoff, a final live
-refresh from this Codex process failed because `tigressgateway` auth was not
-available, so the next agent should refresh SSH first.
+keyboard-interactive auth and ControlMaster. At this handoff, `ssh della-gpu`
+is working from this Codex process.
 
 ## Scientific Goal
 
@@ -45,22 +44,28 @@ Key conclusion so far: learning/predicting `z_init` directly from a large DDIM
 sample set did not reveal an obvious easy low-rank structure. The practical
 direction is scaling side-adapter training with fresh noise.
 
-## Current Status - 2026-06-11 20:26 PDT
+## Current Status - 2026-06-12 04:07 PDT
 
 - Active single-GPU full-cache batch-5 job `9541718` is still running on
   `della-i21g3` from the canonical Della checkout. Run dir:
   `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5`.
-- Step-4000 validation landed and improved to `0.21933504613116384`.
-  `ckpt_latest.pt` was copied to `ckpt_step4000.pt`.
-- Step-4000 eval job `9573559` completed cleanly (`COMPLETED 0:0`, elapsed
-  `00:02:23`) with output dir:
-  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step4000_ep399_v0_s00004_s1000_1001/`.
+- Latest inspected training log line is step `6000`; validation improved to
+  `0.20909928111359477`.
+- Validation trend:
+  - step 1000: `0.2770900116302073`
+  - step 2000: `0.24543552426621318`
+  - step 3000: `0.23995679058134556`
+  - step 4000: `0.21933504613116384`
+  - step 5000: `0.21644743299111724`
+  - step 6000: `0.20909928111359477`
+- Step-6000 eval job `9582155` completed cleanly with output dir:
+  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step6000_ep399_v0_s00004_s1000_1001/`.
   Local artifacts:
-  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step4000_ep399_v0_s00004_s1000_1001/`.
+  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step6000_ep399_v0_s00004_s1000_1001/`.
   Viz URL:
-  `http://localhost:8765/view?path=Wan2.2/_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step4000_ep399_v0_s00004_s1000_1001`.
+  `http://localhost:8765/view?path=Wan2.2/_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step6000_ep399_v0_s00004_s1000_1001`.
   Contact sheet:
-  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step4000_ep399_v0_s00004_s1000_1001/droid_full_bs5_step4000_eval_contact_sheet.jpg`.
+  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step6000_ep399_v0_s00004_s1000_1001/droid_full_bs5_step6000_eval_contact_sheet.jpg`.
 - Previous full-cache evals:
   - step 1000: seed1000 MSE `0.29633891582489014`, seed1001 MSE
     `0.2788466513156891`.
@@ -72,8 +77,13 @@ direction is scaling side-adapter training with fresh noise.
     `0.24768376350402832`.
   - step 5000: seed1000 MSE `0.23440805077552795`, seed1001 MSE
     `0.23428887128829956`.
+  - step 6000: seed1000 MSE `0.23397839069366455`, seed1001 MSE
+    `0.23458802700042725`.
   Qualitatively, the scene remains much better than null, but the moving
-  robot/gripper still turns gray/hazy/smeared after motion starts.
+  robot/gripper still turns gray/hazy/smeared after motion starts. Step `6000`
+  improved validation but fixed held-out MSE is essentially flat versus step
+  `5000`, so more single-GPU steps at this setting are not clearly fixing the
+  motion-region blur.
 - Step-5000 eval job `9579605` completed cleanly (`COMPLETED 0:0`, elapsed
   `00:02:17`). Local artifacts:
   `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step5000_ep399_v0_s00004_s1000_1001/`.
@@ -84,12 +94,16 @@ direction is scaling side-adapter training with fresh noise.
 - Full 8-GPU DDP job `9565757` is dependency-released and pending on priority
   from isolated Della worktree
   `/scratch/gpfs/AM43/lz3952/worktrees/Wan2.2/codex-droid-ddp-8gpu-barrierfix`.
-  Latest start estimate is `2026-06-12T14:49:54` Della time on
-  `della-i20g2` with a 2-day time limit. Run dir:
+  Latest start estimate is `2026-06-12T16:51:21` Della time on
+  `della-i24g2` with a 2-day time limit. Run dir:
   `runs/action_droid_dist_side_bn512h8_L0-29_fresh_25step_fullcache_10k_lr5e-5_bs5x8_ddp_7cb94a9`.
 - The 8-GPU smoke job `9565756` passed: world size `8`, one optimizer step,
   validation/checkpoint writes, and no NCCL ambiguous-device barrier warning.
-- Do not send a final answer while `9541718`, `9573559`, or `9565757` still
+- Current DROID trainer multi-GPU mode is DDP, not FSDP. Upstream Wan FSDP
+  utilities are present for generation/inference sharding (`generate.py`
+  `--t5_fsdp`/`--dit_fsdp`, `wan/distributed/fsdp.py`, Wan pipeline modules),
+  but there is no ready FSDP fine-tuning/training path in this repo.
+- Do not send a final answer while `9541718` or `9565757` still
   need active monitoring, artifact inspection, or relaunch/debug handling.
 
 ## Current Status - 2026-06-11 05:35 PDT
