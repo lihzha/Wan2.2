@@ -3922,3 +3922,60 @@ Analysis:
 Next:
 - Continue low-cadence DDP monitoring; inspect stdout/stderr immediately once
   the job starts.
+
+## 2026-06-13 01:15 PDT - Cleanup stale Della artifacts under AM43 pressure
+
+Goal:
+- Free scratch fileset space while preserving the useful checkpoints and active
+  DDP training state.
+
+Change:
+- Removed only derived stale checkpoints and smoke-only run artifacts from
+  Della scratch. No source code changed.
+
+Command / Job:
+- cleanup target: `/scratch/gpfs/AM43/lz3952/Wan2.2` and the isolated DDP
+  worktree `/scratch/gpfs/AM43/lz3952/worktrees/Wan2.2/codex-droid-ddp-8gpu-barrierfix`
+- active DDP job: `9565757`
+
+Result:
+- Kept current single-GPU run checkpoints:
+  - `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/ckpt_step9000.pt`
+  - `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/ckpt_best_val.pt`
+- Deleted stale current single-GPU checkpoints:
+  - `ckpt_step1000.pt` through `ckpt_step8000.pt`
+  - `ckpt_latest.pt`
+- Kept overfit checkpoint:
+  - `runs/action_overfit_ep0_v0_side_1step_fixed/ckpt_best.pt`
+- Deleted stale overfit checkpoint:
+  - `runs/action_overfit_ep0_v0_side_1step_fixed/ckpt_latest.pt`
+- Deleted smoke-only run dirs:
+  - `runs/action_droid_side_bn512h8_L0-29_fresh_25step_currentcache_414835_20260610_042850_smoke`
+  - `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_smoke_bs5`
+  - `runs/action_droid_smoke_partial_h200_1step`
+  - isolated-worktree `runs/action_droid_dist_ddp8_smoke_7cb94a9`
+- Estimated removed size before deletion: `23.43 GiB`.
+- Post-cleanup keep check confirmed:
+  - `ckpt_best_val.pt` `914M`
+  - `ckpt_step9000.pt` `914M`
+  - overfit `ckpt_best.pt` `1.2G`
+- `checkquota` after cleanup reports AM43 fileset pressure:
+  - `/scratch/gpfs/AM43`: `24.9TiB / 25TiB`
+  - `lz3952` share: about `732GiB`
+
+DDP status:
+- Full 8-GPU job `9565757` remains pending with reason `Priority`.
+- Latest checked `squeue --start` estimate:
+  `2026-06-13T17:15:12` Della time on `della-i19g1`.
+
+Analysis:
+- The cleanup preserved the best single-GPU checkpoint and best overfit
+  checkpoint. Deleted files were superseded checkpoints or smoke outputs already
+  recorded in the worklog.
+- The remaining pressure is at the AM43 fileset level; further large savings
+  would require deleting older non-smoke runs, datasets/caches, or asking other
+  AM43 users to clean up.
+
+Next:
+- Continue low-cadence DDP monitoring; inspect stdout/stderr immediately once
+  job `9565757` starts.

@@ -1,6 +1,6 @@
 # Wan2.2 Della Handoff
 
-Last updated: 2026-06-12 17:36 PDT.
+Last updated: 2026-06-13 01:15 PDT.
 
 This is the short handoff for the next agent. The full chronological record is
 in `WORKLOG.md`.
@@ -17,8 +17,8 @@ in `WORKLOG.md`.
   `f37022874c588817d4ed77d463e3d27745053df4`
 - Distributed-training implementation commit:
   `dd6f1c829a968f00c47947d835a9e6ee1f36d127`
-- The canonical Della checkout is intentionally left at the old commit while
-  active single-GPU job `9541718` runs. Deploy DDP from an isolated Della
+- The canonical Della checkout is intentionally left at the old commit for the
+  completed single-GPU job `9541718`. Deploy DDP from the isolated Della
   worktree, not by mutating `/scratch/gpfs/AM43/lz3952/Wan2.2`.
 
 Use Git for tracked code/config/script/docs. Do not deploy tracked source with
@@ -44,7 +44,7 @@ Key conclusion so far: learning/predicting `z_init` directly from a large DDIM
 sample set did not reveal an obvious easy low-rank structure. The practical
 direction is scaling side-adapter training with fresh noise.
 
-## Current Status - 2026-06-12 17:04 PDT
+## Current Status - 2026-06-13 01:15 PDT
 
 - Single-GPU full-cache batch-5 job `9541718` exited by wall time on
   `della-i21g3` from the canonical Della checkout. `sacct` reports parent
@@ -58,6 +58,20 @@ direction is scaling side-adapter training with fresh noise.
 - Step `9000` is the best single-GPU checkpoint from this run; do not treat the
   timeout as a training-code failure. Resume support should not be added unless
   the user explicitly asks for it.
+- Cleanup on `2026-06-13 01:15 PDT` removed about `23.43 GiB` of stale derived
+  artifacts while preserving the useful checkpoints. Retained remote
+  single-GPU checkpoints are only `ckpt_step9000.pt` and `ckpt_best_val.pt`;
+  stale `ckpt_step1000.pt` through `ckpt_step8000.pt` and `ckpt_latest.pt` were
+  deleted. Retained overfit checkpoint is
+  `runs/action_overfit_ep0_v0_side_1step_fixed/ckpt_best.pt`; the stale
+  `ckpt_latest.pt` in that run was deleted. Smoke-only run dirs removed:
+  `action_droid_side_bn512h8_L0-29_fresh_25step_currentcache_414835_20260610_042850_smoke`,
+  `action_droid_side_bn512h8_L0-29_fresh_25step_window_smoke_bs5`,
+  `action_droid_smoke_partial_h200_1step`, and isolated-worktree
+  `action_droid_dist_ddp8_smoke_7cb94a9`.
+- `checkquota` after cleanup reports AM43 fileset pressure, not global GPFS
+  capacity: `/scratch/gpfs/AM43` is `24.9TiB / 25TiB`, and user `lz3952`
+  accounts for about `732GiB`.
 - Validation trend:
   - step 1000: `0.2770900116302073`
   - step 2000: `0.24543552426621318`
@@ -113,7 +127,7 @@ direction is scaling side-adapter training with fresh noise.
   from isolated Della worktree
   `/scratch/gpfs/AM43/lz3952/worktrees/Wan2.2/codex-droid-ddp-8gpu-barrierfix`.
   Latest observed reason is `Priority`; latest checked start estimate slipped
-  to `2026-06-13T10:00:28` Della time on `della-i23g2`. Run dir:
+  to `2026-06-13T17:15:12` Della time on `della-i19g1`. Run dir:
   `runs/action_droid_dist_side_bn512h8_L0-29_fresh_25step_fullcache_10k_lr5e-5_bs5x8_ddp_7cb94a9`.
 - The 8-GPU smoke job `9565756` passed: world size `8`, one optimizer step,
   validation/checkpoint writes, and no NCCL ambiguous-device barrier warning.
@@ -121,8 +135,8 @@ direction is scaling side-adapter training with fresh noise.
   utilities are present for generation/inference sharding (`generate.py`
   `--t5_fsdp`/`--dit_fsdp`, `wan/distributed/fsdp.py`, Wan pipeline modules),
   but there is no ready FSDP fine-tuning/training path in this repo.
-- Do not send a final answer while `9541718` or `9565757` still
-  need active monitoring, artifact inspection, or relaunch/debug handling.
+- Do not send a final answer while `9565757` still needs active monitoring,
+  artifact inspection, or relaunch/debug handling.
 
 ## Current Status - 2026-06-11 05:35 PDT
 
