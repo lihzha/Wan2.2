@@ -3827,3 +3827,68 @@ Next:
   completes, or unexpectedly reaches step `10000`.
 - Keep monitoring 8-GPU DDP job `9565757`; inspect launch logs immediately
   when it starts.
+
+## 2026-06-12 17:04 PDT - Full-cache batch-5 single-GPU wall-time exit
+
+Goal:
+- Inspect the terminal state of the single-GPU batch-5 run after wall time and
+  preserve final logs/artifacts locally.
+
+Hypothesis:
+- The job should time out cleanly before step `10000`, with the latest durable
+  checkpoint at step `9000` because checkpointing/validation runs every 1000
+  steps.
+
+Change:
+- No source change. Fetched final small logs/CSVs locally.
+
+Version Control:
+- branch: `codex/droid-ddp-8gpu`
+- implementation_commit: `n/a` for monitoring/fetch.
+- changed_files:
+  - `WORKLOG.md`
+  - `HANDOFF.md`
+
+Command / Job:
+- training job: `9541718`
+- run dir:
+  `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5`
+- fetched local files:
+  - `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/config.json`
+  - `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/train_log.csv`
+  - `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/val_log.csv`
+  - `_cluster/slurm_outputs/action-droid/out_act-droid-win-10k_9541718.log`
+  - `_cluster/slurm_outputs/action-droid/err_act-droid-win-10k_9541718.log`
+
+Result:
+- status: expected timeout
+- `sacct -j 9541718`:
+  - parent state `TIMEOUT`, elapsed `1-12:05:10`
+  - batch state `CANCELLED`, exit `0:15`, elapsed `1-12:05:11`
+  - batch `MaxRSS=41594428K`
+- Final train CSV step: `9420`.
+- Final validation/checkpoint step: `9000`.
+- Final validation loss at step `9000`: `0.20228713611140847`.
+- `ckpt_latest.pt` timestamp:
+  `2026-06-12 18:25:58 -0400`, size `958230026` bytes.
+- `ckpt_step9000.pt` timestamp:
+  `2026-06-12 18:26:46 -0400`, size `958230026` bytes.
+- Slurm stderr confirms:
+  `JOB 9541718 ... CANCELLED ... DUE TO TIME LIMIT`.
+- No `summary.json` exists for this run.
+- Full 8-GPU job `9565757` remains pending; latest checked estimate was
+  `2026-06-13T06:33:00` Della time on `della-i24g2`.
+
+Analysis:
+- The timeout is expected from the original 36-hour wall limit and does not
+  indicate a training-code failure.
+- Step `9000` is the best durable checkpoint for this single-GPU run. Steps
+  `9020` through `9420` are train-log-only progress with no validation or
+  checkpoint snapshot.
+- The DDP run is now the intended continuation path for larger-batch training.
+  Do not treat the single-GPU timeout as failure requiring relaunch unless the
+  user explicitly asks for single-GPU resume support.
+
+Next:
+- Monitor 8-GPU DDP job `9565757`; inspect launch logs immediately when it
+  starts.

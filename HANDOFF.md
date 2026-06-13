@@ -1,6 +1,6 @@
 # Wan2.2 Della Handoff
 
-Last updated: 2026-06-12 15:32 PDT.
+Last updated: 2026-06-12 17:04 PDT.
 
 This is the short handoff for the next agent. The full chronological record is
 in `WORKLOG.md`.
@@ -44,15 +44,20 @@ Key conclusion so far: learning/predicting `z_init` directly from a large DDIM
 sample set did not reveal an obvious easy low-rank structure. The practical
 direction is scaling side-adapter training with fresh noise.
 
-## Current Status - 2026-06-12 15:32 PDT
+## Current Status - 2026-06-12 17:04 PDT
 
-- Active single-GPU full-cache batch-5 job `9541718` is still running on
-  `della-i21g3` from the canonical Della checkout. Run dir:
+- Single-GPU full-cache batch-5 job `9541718` exited by wall time on
+  `della-i21g3` from the canonical Della checkout. `sacct` reports parent
+  `TIMEOUT`, batch `CANCELLED 0:15`, elapsed `1-12:05:10`. Run dir:
   `runs/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5`.
-- Latest inspected training CSV line is step `9020`; validation improved to a
-  new best `0.20228713611140847` at step `9000`. The job wall-time ends at
-  `2026-06-12T19:58:30` Della time, so step `10000` is unlikely before this
-  single-GPU job exits.
+- Final train CSV step is `9420`. Final durable validation/checkpoint is step
+  `9000`; no step-10000 checkpoint exists. Final small logs/CSVs were fetched
+  locally under:
+  `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/`
+  and `_cluster/slurm_outputs/action-droid/`.
+- Step `9000` is the best single-GPU checkpoint from this run; do not treat the
+  timeout as a training-code failure. Resume support should not be added unless
+  the user explicitly asks for it.
 - Validation trend:
   - step 1000: `0.2770900116302073`
   - step 2000: `0.24543552426621318`
@@ -108,7 +113,7 @@ direction is scaling side-adapter training with fresh noise.
   from isolated Della worktree
   `/scratch/gpfs/AM43/lz3952/worktrees/Wan2.2/codex-droid-ddp-8gpu-barrierfix`.
   Latest observed reason is `Priority`; latest checked start estimate slipped
-  to `2026-06-12T22:00:00` Della time. Run dir:
+  to `2026-06-13T06:33:00` Della time on `della-i24g2`. Run dir:
   `runs/action_droid_dist_side_bn512h8_L0-29_fresh_25step_fullcache_10k_lr5e-5_bs5x8_ddp_7cb94a9`.
 - The 8-GPU smoke job `9565756` passed: world size `8`, one optimizer step,
   validation/checkpoint writes, and no NCCL ambiguous-device barrier warning.
