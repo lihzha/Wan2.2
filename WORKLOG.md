@@ -3966,7 +3966,7 @@ Result:
 DDP status:
 - Full 8-GPU job `9565757` remains pending with reason `Priority`.
 - Latest checked `squeue --start` estimate:
-  `2026-06-13T23:00:00` Della time on `della-i22g1`.
+  `2026-06-14T03:36:00` Della time on `della-i23g3`.
 
 Analysis:
 - The cleanup preserved the best single-GPU checkpoint and best overfit
