@@ -3892,3 +3892,33 @@ Analysis:
 Next:
 - Monitor 8-GPU DDP job `9565757`; inspect launch logs immediately when it
   starts.
+
+## 2026-06-12 17:36 PDT - 8-GPU DDP still pending after single-GPU timeout
+
+Goal:
+- Refresh the active 8-GPU DDP queue state after the single-GPU batch-5 job
+  timed out.
+
+Change:
+- No source change. Queue/status monitoring only.
+
+Command / Job:
+- full 8-GPU DDP job: `9565757`
+- DDP run dir:
+  `runs/action_droid_dist_side_bn512h8_L0-29_fresh_25step_fullcache_10k_lr5e-5_bs5x8_ddp_7cb94a9`
+- DDP source worktree:
+  `/scratch/gpfs/AM43/lz3952/worktrees/Wan2.2/codex-droid-ddp-8gpu-barrierfix`
+
+Result:
+- status: pending
+- `squeue` reason: `Priority`
+- latest checked `squeue --start` estimate:
+  `2026-06-13T10:00:28` Della time on `della-i23g2`.
+
+Analysis:
+- This is scheduler/resource delay, not a DDP code failure. The full 8-GPU run
+  has not started, so there are still no full-run DDP logs to inspect.
+
+Next:
+- Continue low-cadence DDP monitoring; inspect stdout/stderr immediately once
+  the job starts.

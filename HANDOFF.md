@@ -1,6 +1,6 @@
 # Wan2.2 Della Handoff
 
-Last updated: 2026-06-12 17:04 PDT.
+Last updated: 2026-06-12 17:36 PDT.
 
 This is the short handoff for the next agent. The full chronological record is
 in `WORKLOG.md`.
@@ -113,7 +113,7 @@ direction is scaling side-adapter training with fresh noise.
   from isolated Della worktree
   `/scratch/gpfs/AM43/lz3952/worktrees/Wan2.2/codex-droid-ddp-8gpu-barrierfix`.
   Latest observed reason is `Priority`; latest checked start estimate slipped
-  to `2026-06-13T06:33:00` Della time on `della-i24g2`. Run dir:
+  to `2026-06-13T10:00:28` Della time on `della-i23g2`. Run dir:
   `runs/action_droid_dist_side_bn512h8_L0-29_fresh_25step_fullcache_10k_lr5e-5_bs5x8_ddp_7cb94a9`.
 - The 8-GPU smoke job `9565756` passed: world size `8`, one optimizer step,
   validation/checkpoint writes, and no NCCL ambiguous-device barrier warning.
