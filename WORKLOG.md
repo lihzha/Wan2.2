@@ -3980,6 +3980,34 @@ Next:
 - Continue low-cadence DDP monitoring; inspect stdout/stderr immediately once
   job `9565757` starts.
 
+## 2026-06-14 02:51 PDT - 8-GPU DDP priority estimate slipped to Monday morning
+
+Goal:
+- Refresh the active DDP queue state after the projection stabilized at a later
+  Monday-morning start estimate.
+
+Change:
+- No source change. Queue/status monitoring only.
+
+Command / Job:
+- full 8-GPU DDP job: `9565757`
+
+Result:
+- status: pending
+- latest observed reason: `Priority`
+- latest checked start estimate:
+  `2026-06-15T09:36:00` Della time on `della-i19g3`
+- full-run stdout/stderr files still do not exist.
+
+Analysis:
+- The 8-GPU job remains externally scheduler-delayed. It has not started,
+  failed, or produced logs, and no repo/debug action is available while it is
+  pending on priority.
+
+Next:
+- Continue low-cadence DDP monitoring; inspect stdout/stderr immediately once
+  job `9565757` starts.
+
 ## 2026-06-13 22:09 PDT - 8-GPU DDP priority estimate slipped to June 15
 
 Goal:
