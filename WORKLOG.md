@@ -3980,6 +3980,33 @@ Next:
 - Continue low-cadence DDP monitoring; inspect stdout/stderr immediately once
   job `9565757` starts.
 
+## 2026-06-13 21:21 PDT - 8-GPU DDP still pending after midnight Della
+
+Goal:
+- Refresh the DDP queue state after another scheduler projection slip.
+
+Change:
+- No source change. Queue/status monitoring only.
+
+Command / Job:
+- full 8-GPU DDP job: `9565757`
+
+Result:
+- status: pending
+- latest observed `squeue` reason: `Priority`
+- latest checked start estimate:
+  `2026-06-14T20:15:26` Della time on `della-i20g2`
+- full-run stdout/stderr files still do not exist.
+
+Analysis:
+- The job remains correctly queued with no dependency and no training-code
+  signal. The long delay is scheduler priority/resource reshuffling for the
+  single-node 8-GPU request.
+
+Next:
+- Continue low-cadence DDP monitoring; inspect stdout/stderr immediately once
+  job `9565757` starts.
+
 ## 2026-06-13 18:50 PDT - 8-GPU DDP reverted to priority wait
 
 Goal:
