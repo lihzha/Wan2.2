@@ -3980,6 +3980,38 @@ Next:
 - Continue low-cadence DDP monitoring; inspect stdout/stderr immediately once
   job `9565757` starts.
 
+## 2026-06-14 11:59 PDT - 8-GPU DDP still pending on priority
+
+Goal:
+- Refresh the live status of the 8-GPU DDP job after the user asked for a
+  status update.
+
+Change:
+- No source change. Queue/status monitoring only.
+
+Command / Job:
+- full 8-GPU DDP job: `9565757`
+- DDP source worktree:
+  `/scratch/gpfs/AM43/lz3952/worktrees/Wan2.2/codex-droid-ddp-8gpu-barrierfix`
+
+Result:
+- status: pending
+- live `squeue`/`scontrol` reason: `Priority`
+- `Dependency=(null)`
+- request remains `gres/gpu=8`, `cpu=64`, `mem=720G`, `TimeLimit=2-00:00:00`
+- latest checked start estimate:
+  `2026-06-15T11:45:25` Della time / `2026-06-15 08:45:25 PDT`
+- full-run stdout/stderr files still do not exist.
+- run directory has not been created yet.
+
+Analysis:
+- The job has not started, failed, or produced logs. This remains scheduler
+  delay for the single-node 8-GPU request, not a DDP code signal.
+
+Next:
+- Continue low-cadence DDP monitoring; inspect stdout/stderr immediately once
+  job `9565757` starts.
+
 ## 2026-06-14 04:50 PDT - 8-GPU DDP blocked by AM43 QOS group GPU limit
 
 Goal:
