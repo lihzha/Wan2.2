@@ -3980,6 +3980,34 @@ Next:
 - Continue low-cadence DDP monitoring; inspect stdout/stderr immediately once
   job `9565757` starts.
 
+## 2026-06-13 18:50 PDT - 8-GPU DDP reverted to priority wait
+
+Goal:
+- Capture the queue regression after a short `Resources` window.
+
+Change:
+- No source change. Queue/status monitoring only.
+
+Command / Job:
+- full 8-GPU DDP job: `9565757`
+
+Result:
+- status: pending
+- `scontrol show job 9565757` confirms `Reason=Priority`,
+  `Dependency=(null)`, same 8-GPU request, and `SchedNodeList=della-i21g2`.
+- Latest checked start estimate:
+  `2026-06-14T14:19:02` Della time on `della-i21g2`.
+- Full-run stdout/stderr files still do not exist.
+
+Analysis:
+- This is scheduler reshuffling, not a job failure. The job briefly advanced to
+  resource wait, then reverted to priority wait. There is still no training-code
+  signal to inspect.
+
+Next:
+- Continue low-cadence DDP monitoring; inspect stdout/stderr immediately once
+  job `9565757` starts.
+
 ## 2026-06-13 18:22 PDT - 8-GPU DDP pending reason advanced to Resources
 
 Goal:
