@@ -3980,6 +3980,39 @@ Next:
 - Continue low-cadence DDP monitoring; inspect stdout/stderr immediately once
   job `9565757` starts.
 
+## 2026-06-14 04:50 PDT - 8-GPU DDP blocked by AM43 QOS group GPU limit
+
+Goal:
+- Diagnose the latest DDP pending reason after it changed from plain priority
+  to a QOS group GPU limit.
+
+Change:
+- No source change. Queue/status monitoring only.
+
+Command / Job:
+- full 8-GPU DDP job: `9565757`
+
+Result:
+- status: pending
+- `scontrol show job 9565757`:
+  - `Reason=QOSGrpGRES`
+  - `Dependency=(null)`
+  - `ReqTRES=cpu=64,mem=720G,node=1,billing=96,gres/gpu=8`
+  - latest estimate `2026-06-15T08:12:00` Della time
+- Full-run stdout/stderr files still do not exist.
+- AM43 queue check showed other running GPU usage, including an 8-GPU
+  `post_train_oxe_droid` job and two 1-GPU `lam_infer_oxe` jobs, plus many
+  pending 8-GPU jobs under the same account.
+
+Analysis:
+- This is an external AM43/QOS group GPU limit, not a DDP code failure and not a
+  dependency issue. The job remains correctly queued but cannot start until the
+  account/QOS has enough GPU capacity.
+
+Next:
+- Continue low-cadence DDP monitoring; inspect stdout/stderr immediately once
+  job `9565757` starts.
+
 ## 2026-06-14 04:21 PDT - 8-GPU DDP priority estimate slipped to Monday afternoon
 
 Goal:
