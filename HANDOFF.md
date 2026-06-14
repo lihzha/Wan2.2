@@ -1,6 +1,6 @@
 # Wan2.2 Della Handoff
 
-Last updated: 2026-06-13 13:35 PDT.
+Last updated: 2026-06-13 18:22 PDT.
 
 This is the short handoff for the next agent. The full chronological record is
 in `WORKLOG.md`.
@@ -123,11 +123,11 @@ direction is scaling side-adapter training with fresh noise.
   `http://localhost:8765/view?path=Wan2.2/_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step5000_ep399_v0_s00004_s1000_1001`.
   Contact sheet:
   `_cluster/action_droid_side_bn512h8_L0-29_fresh_25step_window_top50_10k_lr5e-5_bs5/videos_step5000_ep399_v0_s00004_s1000_1001/droid_full_bs5_step5000_eval_contact_sheet.jpg`.
-- Full 8-GPU DDP job `9565757` is dependency-released and pending on priority
+- Full 8-GPU DDP job `9565757` is dependency-released and pending in Slurm
   from isolated Della worktree
   `/scratch/gpfs/AM43/lz3952/worktrees/Wan2.2/codex-droid-ddp-8gpu-barrierfix`.
-  Latest observed reason is `Priority`; latest checked start estimate slipped
-  to `2026-06-14T03:36:00` Della time on `della-i23g3`. Run dir:
+  Latest observed reason is `Resources`; latest checked start estimate is
+  `2026-06-13T23:15:28` Della time on `della-i23g3`. Run dir:
   `runs/action_droid_dist_side_bn512h8_L0-29_fresh_25step_fullcache_10k_lr5e-5_bs5x8_ddp_7cb94a9`.
 - The 8-GPU smoke job `9565756` passed: world size `8`, one optimizer step,
   validation/checkpoint writes, and no NCCL ambiguous-device barrier warning.

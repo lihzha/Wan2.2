@@ -3979,3 +3979,35 @@ Analysis:
 Next:
 - Continue low-cadence DDP monitoring; inspect stdout/stderr immediately once
   job `9565757` starts.
+
+## 2026-06-13 18:22 PDT - 8-GPU DDP pending reason advanced to Resources
+
+Goal:
+- Capture the DDP queue state change after long priority wait.
+
+Change:
+- No source change. Queue/status monitoring only.
+
+Command / Job:
+- full 8-GPU DDP job: `9565757`
+- DDP source worktree:
+  `/scratch/gpfs/AM43/lz3952/worktrees/Wan2.2/codex-droid-ddp-8gpu-barrierfix`
+
+Result:
+- status: pending
+- `squeue` reason changed from `Priority` to `Resources`.
+- `scontrol show job 9565757` confirms `Dependency=(null)`, `Reason=Resources`,
+  `ReqTRES=cpu=64,mem=720G,node=1,billing=96,gres/gpu=8`, and
+  `SchedNodeList=della-i23g3`.
+- Latest checked start estimate:
+  `2026-06-13T23:15:28` Della time on `della-i23g3`.
+- Full-run stdout/stderr files do not exist yet.
+
+Analysis:
+- This is progress versus pure priority wait. Slurm is now waiting on the
+  requested 8-GPU node resources; there is still no training-code signal to
+  inspect.
+
+Next:
+- Continue low-cadence DDP monitoring; inspect stdout/stderr immediately once
+  job `9565757` starts.
